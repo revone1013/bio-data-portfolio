@@ -23,10 +23,6 @@ Analysis of peripheral blood mononuclear cells using **Seurat** and **SingleR** 
 
 **Tech:** R, Seurat, SingleR, Bioconductor, ggplot2  
 
-
-- 📂 **Code on GitHub:** [Open folder](https://github.com/revone1013/bio-data-portfolio/tree/main/pbmc-scRNA)
-
-
 ---
 
 ### 2️⃣ [ERK1/2 Motif Discovery and Transcription Factor Prediction](./erk-mapk1-3)
@@ -38,9 +34,6 @@ Investigation of **ERK1/2 signaling** and potential downstream **transcription f
 - Integration of cross-species promoter data (mouse and zebrafish)  
 
 **Tech:** MEME Suite, pyjaspar, Biopython, R  
-
-
-- 📂 **Code on GitHub:** [Open folder](https://github.com/revone1013/bio-data-portfolio/tree/main/erk-mapk1-3)
 
 ---
 
