@@ -1,0 +1,310 @@
+!pip install gseapy
+import gseapy as gp
+# List all available gene sets
+libraries = gp.get_library_name()
+print(libraries)
+import pandas as pd
+import numpy as np
+# Load the CSV file(igps and docking)
+file_path = '100_sp_igps+docking_ERK12_filtered_1m.xlsx' # Replace with the path to your file
+df = pd.read_excel(file_path)
+# Extract the first column (gene names)
+#gene_names = df.iloc[:, 0]
+gene_names = df['Gene Name'].unique()
+# Print the extracted gene names
+print(gene_names)
+# Print the extracted gene names
+# this is for making up previous result
+# since previous sometimes generate only uniprot ID no gene name
+# so later name are the only list element
+with open('gene_list.txt', 'w') as f:
+f.write('\n'.join(gene_names))
+# Specify the library name
+gene_sets = 'GO_Biological_Process_2023'
+#GO_Cellular_Component_2023
+#GO_Molecular_Function_2023
+#GO_Biological_Process_2023
+# Run Enrichr
+enrichr_results = gp.enrichr(
+gene_list=list(gene_names), # gene list
+gene_sets=gene_sets, # Specify the library
+organism='Mouse', # Organism of interest
+outdir='enrichr_results', # Output directory
+)
+# Print results summary
+print(enrichr_results.results.head())
+# Save results to a file
+enrichr_results.results.to_csv('ORA_results_BP_100.csv', index=False)
+#Gene Ratio
+#The Gene Ratio represents the proportion of genes from your gene set that are associated with
+#a particular term, pathway, or biological process. It is calculated by dividing the number of
+#genes associated with a given term (numerator) by the total number of genes in that category (denominator).
+#This metric offers a simple and intuitive measure of how many of the genes in
+#your dataset are linked to a specific biological term.
+#The Gene Ratio is particularly useful when you are interested in understanding
+#the relative proportion of your genes involved in various terms or processes,
+#without comparing these proportions to a baseline or control group.
+#It is commonly employed during the exploratory phases of analysis,
+#providing an initial sense of enrichment and helping to identify potential biological themes
+#for further investigation.
+#bar chart
+# Load the CSV file
+file_path = "ORA_results_BP_100.csv"
+data = pd.read_csv(file_path, encoding='latin1')
+# Display the first few rows
+print(data.head())
+# Convert 'Adjusted P-value' to numeric
+# handles scientific notation like 1.37E-40
+data['Adjusted P-value'] = pd.to_numeric(data['Adjusted P-value'], errors='coerce')
+# Drop rows with NaN in 'Adjusted P-value' (if any values couldn't be converted)
+data = data.dropna(subset=['Adjusted P-value'])
+# Calculate -log10(adjusted p-value) for visualization
+data['-log10(Adjusted P-Value)'] = -np.log10(data['Adjusted P-value'])
+print(data.head())
+import matplotlib.pyplot as plt
+import numpy as np
+# Sort by adjusted p-value
+data_sorted = data.sort_values('-log10(Adjusted P-Value)', ascending=False).head(10)
+# Remove the GO ID from term labels
+data_sorted['Clean_Term'] = data_sorted['Term'].str.replace(r'\s*\(GO:\d+\)', '', regex=True)
+import textwrap
+# Wrap long GO terms to two lines (e.g., at 40 characters)
+# xxxxxxxxxxxxxx
+# xxxx
+# xxxx
+def wrap_labels(label, width=40):
+return '\n'.join(textwrap.wrap(label, width))
+# Apply to your 'Term' or 'Clean_Term' column
+data_sorted['Wrapped_Term'] = data_sorted['Clean_Term'].apply(lambda x: wrap_labels(x, width=40))
+# Bar plot
+plt.figure(figsize=(10, 6))
+plt.barh(data_sorted['Wrapped_Term'], data_sorted['-log10(Adjusted P-Value)'],
+color='steelblue')
+# Add FDR = 0.05 line
+fdr_threshold_05 = -np.log10(0.05)
+plt.axvline(x=fdr_threshold_05, color='red', linestyle='--', linewidth=1.5, label='FDR = 0.05')
+# Format plot
+plt.xlabel('-log10(Adjusted P-Value)')
+plt.title('Unbiased Top Enriched GO Terms for Biological Process')
+plt.gca().invert_yaxis()
+plt.legend()
+plt.tight_layout()
+plt.show()
+#gene ratio
+import numpy as np
+import pandas as pd
+# Function to safely calculate Gene Ratio
+def safe_gene_ratio(x):
+try:
+# Split the Overlap string by '/' and get the numerator and denominator
+numerator, denominator = x.split('/')
+# Ensure both parts are numeric and compute the ratio
+if numerator.isdigit() and denominator.isdigit():
+return int(numerator) / int(denominator)
+else:
+return np.nan # Return NaN if invalid data is found
+except Exception as e:
+return np.nan # Return NaN for any errors
+# Apply the function to compute Gene Ratio
+data_sorted['Gene_Ratio'] = data_sorted['Overlap'].apply(safe_gene_ratio)
+# Optionally drop rows where Gene_Ratio is NaN (invalid values)
+data_sorted = data_sorted.dropna(subset=['Gene_Ratio'])
+# Verify the new column
+print(data_sorted[['Gene_Ratio', 'Overlap']].head())
+print(data_sorted.columns)
+#Gene Ratio
+# finally ubiased top10
+# baised top 30
+# data_sorted_30 = data_sorted.head(10)
+import seaborn as sns
+import matplotlib.pyplot as plt
+# Remove the GO ID from term labels
+data_sorted['Clean_Term'] = data_sorted['Term'].str.replace(r'\s*\(GO:\d+\)', '', regex=True)
+import textwrap
+#this is use for changing 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa' into
+#'aaa'
+#'aaa'
+# Wrap long GO terms to two lines (e.g., at 40 characters)
+def wrap_labels(label, width=40):
+return '\n'.join(textwrap.wrap(label, width))
+# Apply to your 'Term' or 'Clean_Term' column
+data_sorted['Wrapped_Term'] = data_sorted['Clean_Term'].apply(lambda x: wrap_labels(x, width=40))
+# Dot plot for top 10 terms
+plt.figure(figsize=(10, 6))
+sns.scatterplot(
+x='-log10(Adjusted P-Value)',
+y='Wrapped_Term',
+size='Gene_Ratio',
+hue='Gene_Ratio',
+data=data_sorted_30,
+sizes=(50, 200),
+palette='viridis'
+)
+# Add FDR threshold lines
+plt.axvline(x=-np.log10(0.05), color='red', linestyle='--', label='FDR=0.05') # FDR 0.05 line
+#plt.axvline(x=-np.log10(0.1), color='orange', linestyle='--', label='FDR 0.1') # FDR 0.1 line
+# Customize plot
+plt.title('Unbiased Top Enriched GO Terms for Biological Process')
+plt.xlabel('-log10(Adjusted P-Value)')
+plt.ylabel('GO Terms')
+plt.legend(title='Gene Ratio', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
+# Show plot
+plt.show()
+# term and matched gene ratio
+term_gene_ratio_list = data_sorted_30[['Term', 'Gene_Ratio']].values.tolist()
+# print
+for term, ratio in term_gene_ratio_list:
+print(f"GO Term: {term}, Gene Ratio: {ratio}")
+import seaborn as sns
+import matplotlib.pyplot as plt
+# rank from highest to lowest
+sorted_term_gene_ratio_list = sorted(term_gene_ratio_list, key=lambda x: x[1], reverse=True)
+# bar
+plt.figure(figsize=(10, 6))
+sns.barplot(x=[x[1] for x in sorted_term_gene_ratio_list], y=[x[0] for x in sorted_term_gene_ratio_list])
+# title x y
+plt.xlabel('Gene Ratio')
+plt.ylabel('GO Terms')
+plt.title('Unbiased Gene Ratio Distribution Across GO Terms for Biological Process')
+# automatically improve layout
+plt.tight_layout()
+# show
+plt.show()
+#test biased search
+# select key words
+keywords = ['myelin', 'axon', 'oligodendrocyte', 'neuro', 'synapse', 'MAPK', 'ERK']
+#,
+# Filter the dataset to include only rows that match the keywords
+filtered_data = data[data['Term'].str.contains('|'.join(keywords), case=False, na=False)]
+# Show the filtered data
+print(filtered_data[['Term', 'Genes']])
+import matplotlib.pyplot as plt
+import numpy as np
+# Sort by adjusted p-value
+filtered_data_sorted = filtered_data.sort_values('-log10(Adjusted P-Value)', ascending=False).head(30)
+# Bar plot
+plt.figure(figsize=(10, 6))
+plt.barh(filtered_data_sorted['Term'], filtered_data_sorted['-log10(Adjusted P-Value)'], color='steelblue')
+# add dash line
+fdr_threshold_05 = -np.log10(0.05) # FDR = 0.05 - -log10(0.05)
+#fdr_threshold_10 = -np.log10(0.1) # FDR = 0.1 - -log10(0.1)
+# dash line for FDR 0.05?0.1?
+plt.axvline(x=fdr_threshold_05, color='red', linestyle='--', linewidth=1.5, label='FDR = 0.05')
+#plt.axvline(x=fdr_threshold_10, color='orange', linestyle='--', linewidth=1.5, label='FDR = 0.1')
+# generate bar
+plt.xlabel('-log10(Adjusted P-Value)')
+plt.title('Top Enriched GO Terms for Biological Process')
+plt.gca().invert_yaxis() # reverse y, let the highest on the top
+plt.legend()
+plt.tight_layout()
+plt.show()
+#show if gene in the result, if so, whcih terms match this
+# Define the gene of interest
+gene_of_interest = 'Olig2'
+# Filter the dataset for rows that contain the gene of interest in 'Genes'
+filtered_data = filtered_data[filtered_data['Genes'].str.contains(gene_of_interest, case=False, na=False)]
+# Show the filtered data (just the 'Term' column)
+print(filtered_data[['Term']])
+import numpy as np
+import pandas as pd
+# Function to safely calculate Gene Ratio
+def safe_gene_ratio(x):
+try:
+# Split the Overlap string by '/' and get the numerator and denominator
+numerator, denominator = x.split('/')
+# Ensure both parts are numeric and compute the ratio
+if numerator.isdigit() and denominator.isdigit():
+return int(numerator) / int(denominator)
+else:
+return np.nan # Return NaN if invalid data is found
+except Exception as e:
+return np.nan # Return NaN for any errors
+# Apply the function to compute Gene Ratio
+filtered_data['Gene_Ratio'] = filtered_data['Overlap'].apply(safe_gene_ratio)
+# Optionally drop rows where Gene_Ratio is NaN (invalid values)
+filtered_data = filtered_data.dropna(subset=['Gene_Ratio'])
+# Verify the new column
+print(filtered_data[['Gene_Ratio', 'Overlap']].head())
+#Gene Ratio
+# Sort by -log10(Adjusted P-value) in descending order to get the most significant terms
+filtered_data_sorted = filtered_data.sort_values(by='-log10(Adjusted P-Value)', ascending=False)
+# Get top 10 GO terms based on the -log10(Adjusted P-value)
+top_30_terms = filtered_data_sorted.head(30)
+import seaborn as sns
+import matplotlib.pyplot as plt
+# Dot plot for top 10 terms
+plt.figure(figsize=(10, 6))
+sns.scatterplot(
+x='-log10(Adjusted P-Value)',
+y='Term',
+size='Gene_Ratio',
+hue='Gene_Ratio',
+data=top_30_terms,
+sizes=(50, 200),
+palette='viridis'
+)
+# Add FDR threshold lines
+plt.axvline(x=-np.log10(0.05), color='red', linestyle='--', label='FDR=0.05') # FDR 0.05 line
+#plt.axvline(x=-np.log10(0.1), color='orange', linestyle='--', label='FDR 0.1') # FDR 0.1 line
+# Customize plot
+plt.title('Top Enriched GO Terms for Biological Process')
+plt.xlabel('-log10(Adjusted P-Value)')
+plt.ylabel('GO Terms')
+plt.legend(title='Gene Ratio', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
+# Show plot
+plt.show()
+# Sort by -log10(Adjusted P-value) in descending order to get the most significant terms
+filtered_data_sorted = filtered_data.sort_values(by='-log10(Adjusted P-Value)', ascending=False)
+# Get top 10 GO terms based on the -log10(Adjusted P-value)
+top_30_terms = filtered_data_sorted.head(30)
+import seaborn as sns
+import matplotlib.pyplot as plt
+# Dot plot for top 10 terms
+plt.figure(figsize=(10, 6))
+sns.scatterplot(
+x='-log10(Adjusted P-Value)',
+y='Term',
+size='Gene_Ratio',
+hue='Gene_Ratio',
+data=top_30_terms,
+sizes=(50, 200),
+palette='viridis'
+)
+# Add FDR threshold lines
+plt.axvline(x=-np.log10(0.05), color='red', linestyle='--', label='FDR=0.05') # FDR 0.05 line
+#plt.axvline(x=-np.log10(0.1), color='orange', linestyle='--', label='FDR 0.1') # FDR 0.1 line
+# Customize plot
+plt.title('Top Enriched GO Terms for Biological Process')
+plt.xlabel('-log10(Adjusted P-Value)')
+plt.ylabel('GO Terms')
+plt.legend(title='Gene Ratio', bbox_to_anchor=(1.05, 1), loc='upper left')
+plt.tight_layout()
+# Show plot
+plt.show()
+# list of terms and matched gene ratio
+term_gene_ratio_list = top_30_terms[['Term', 'Gene_Ratio']].values.tolist()
+# print
+for term, ratio in term_gene_ratio_list:
+print(f"GO Term: {term}, Gene Ratio: {ratio}")
+import seaborn as sns
+import matplotlib.pyplot as plt
+# 按照Gene Ratio 排序从大到小
+sorted_term_gene_ratio_list = sorted(term_gene_ratio_list, key=lambda x: x[1],
+reverse=True)
+# 重新绘制条形图
+plt.figure(figsize=(10, 6))
+sns.barplot(x=[x[1] for x in sorted_term_gene_ratio_list], y=[x[0] for x in sorted_term_gene_ratio_list])
+# 添加标签和标题
+plt.xlabel('Gene Ratio')
+plt.ylabel('GO Terms')
+plt.title('Gene Ratio Distribution Across GO Terms for Biological Process')
+# 调整布局
+plt.tight_layout()
+# 显示图形
+plt.show()
+#for Molecul fun like MAPK phos lipid Just change
+#GO_Cellular_Component_2023
+#GO_Molecular_Function_2023
+#GO_Biological_Process_2023

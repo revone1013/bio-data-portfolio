@@ -1,0 +1,219 @@
+!pip install h5py pandas
+import h5py
+import scipy.sparse as sp
+# open H5
+with h5py.File('GSM7021712_C_1m_filtered_feature_bc_matrix.h5', 'r') as f:
+# extract matrix data basically
+data = f['/matrix/data'][:]
+indices = f['/matrix/indices'][:]
+indptr = f['/matrix/indptr'][:]
+shape = (f['/matrix/shape'][0], f['/matrix/shape'][1]) # gene num * cell num
+# sparse martix
+counts_matrix = sp.csr_matrix((data, indices, indptr), shape=shape)
+# sum&mean of counts
+gene_expression_sums = counts_matrix.sum(axis=1) # sum calculated
+gene_expression_means = counts_matrix.mean(axis=1) # mean
+print("Gene expression sums:", gene_expression_sums)
+print("Gene expression means:", gene_expression_means)
+#find ValueError: index pointer size (14281) should be (32286)
+#debug
+import h5py
+with h5py.File('GSM7021712_C_1m_filtered_feature_bc_matrix.h5', 'r') as f:
+data = f['/matrix/data'][:]
+indices = f['/matrix/indices'][:]
+indptr = f['/matrix/indptr'][:]
+shape = (f['/matrix/shape'][0], f['/matrix/shape'][1])
+# check parameters
+print("data length:", len(data))
+print("indices length:", len(indices))
+print("indptr length:", len(indptr))
+print("matrix shape:", shape)
+import h5py
+import scipy.sparse as sp
+import numpy as np
+import pandas as pd
+# open h5
+with h5py.File('GSM7021712_C_1m_filtered_feature_bc_matrix.h5', 'r') as f:
+# extract parameters
+data = f['/matrix/data'][:]
+indices = f['/matrix/indices'][:]
+indptr = f['/matrix/indptr'][:]
+shape = (f['/matrix/shape'][1], f['/matrix/shape'][0]) # change shape(not gene num * cell num but cell num*gene num)
+#in fact the easiest way is to change them when constructing matrix rather than changing here. since not all matrix will be stored like this dataset
+#so this can be shpaed based on matrix especially gene num is not the same to cell num
+# sparse matrix
+counts_matrix = sp.csr_matrix((data, indices, indptr), shape=shape)
+gene_expression_sums = np.array(counts_matrix.sum(axis=0)).flatten() # sum（along gene array）
+gene_expression_means = np.array(counts_matrix.mean(axis=0)).flatten() # mean（along gene array）
+print("Gene expression sums:", gene_expression_sums)
+print("Gene expression means:", gene_expression_means)
+###########################
+# extract gene name and matched ID
+features_group = f['matrix/features']
+feature_type = [item.decode('utf-8') for item in features_group['feature_type'][:]]
+genome = [item.decode('utf-8') for item in features_group['genome'][:]]
+ids = [item.decode('utf-8') for item in features_group['id'][:]]
+names = [item.decode('utf-8') for item in features_group['name'][:]]
+# set up DataFrame
+features_df = pd.DataFrame({
+'feature_type': feature_type,
+'genome': genome,
+'id': ids,
+'name': names
+})
+############################
+# check match
+if len(gene_expression_sums) != len(features_df):
+raise ValueError(f"Length mismatch: gene_expression_sums ({len(gene_expression_sums)}) != features_df ({len(features_df)})")
+# define new column
+features_df['expression_sum'] = gene_expression_sums
+features_df['expression_mean'] = gene_expression_means
+print(features_df.head())
+# save to CSV 文件
+features_df.to_csv('gene_expression_with_names.csv', index=False)
+import matplotlib.pyplot as plt
+# change gene_expression_sums for bar chart
+#（matrix.sum(axis=1)
+# (n_genes, 1)）
+# flatten()-------n_genes
+# infact, ene_expression_sums = np.array(counts_matrix.sum(axis=0)).flatten() # sum（along gene array）
+# this is just for sure
+sums = gene_expression_sums.flatten()
+# bar chart
+plt.figure(figsize=(10, 6))
+plt.hist(sums, bins=50, color='blue', alpha=0.7)
+plt.title("Distribution of Gene Expression Sums")
+plt.yscale("log") # Apply log scale
+plt.xlabel("Expression Sum")
+plt.ylabel("Number of Genes")
+plt.show()
+import pandas as pd
+# read csv
+file_path = "gene_expression_with_names.csv"
+df = pd.read_csv(file_path)
+# check
+print(df.head())
+# check name of the column
+print(df.columns)
+import matplotlib.pyplot as plt
+# select column of expression_sum
+expression_sums = df["expression_sum"]
+# bar chart with log
+plt.figure(figsize=(10, 6))
+plt.hist(expression_sums, bins=100, color="blue", alpha=0.7)
+plt.title("Distribution of Gene Expression Sums")
+plt.yscale("log") # log to y
+plt.xscale("log") # log to x
+plt.xlabel("Expression Sum")
+plt.ylabel("Number of Genes")
+plt.show()
+import numpy as np
+import matplotlib.pyplot as plt
+# select expression_sum
+expression_sum = df["expression_sum"]
+# creat bin to seperate them
+# 50 can be changed
+bins = np.logspace(np.log10(expression_sum.min()+1), np.log10(expression_sum.max()), 50)
+# bar
+plt.figure(figsize=(10, 6))
+plt.hist(expression_sum, bins=bins, color="blue", alpha=0.7)
+plt.xscale("log") # log-x
+plt.yscale("log") # log-y
+plt.title("Distribution of Gene Expression Sums")
+plt.xlabel("Expression Sum")
+plt.ylabel("Number of Genes")
+plt.show()
+#############################################
+import seaborn as sns
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 6))
+#sns.kdeplot(expression_sum, shade=True, color="blue", bw_adjust=0.5) # bw_adjust ctrl if this curve is smmoth
+#sns.kdeplot(expression_sum, fill=True, color="blue", bw_adjust=1.0)
+#sns.kdeplot(expression_sum, fill=True, color="blue", bw_adjust=2.0)
+sns.kdeplot(expression_sum, fill=True, color="blue", bw_adjust=2.5)
+plt.xscale("log")
+plt.title("Kernel Density Estimate of Gene Expression Sums")
+plt.xlabel("Expression Sum")
+plt.ylabel("Density")
+plt.show()
+#merge some of them
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+expression_sum = df['expression_sum']
+# set size
+plt.figure(figsize=(14, 6))
+# fig1
+plt.subplot(1, 3, 1)
+plt.hist(expression_sum, bins=50, color='blue', alpha=0.7)
+plt.yscale('log')
+plt.title("Distribution of Gene Expression Sums (Linear Bins)")
+plt.xlabel("Expression Sum")
+plt.ylabel("Number of Genes (Log Scale)")
+# fig2
+plt.subplot(1, 3, 2)
+bins = np.logspace(np.log10(expression_sum.min() + 1), np.log10(expression_sum.max()), 50)
+plt.hist(expression_sum, bins=bins, color="green", alpha=0.7)
+plt.xscale("log")
+plt.yscale("log")
+plt.title("Distribution of Gene Expression Sums (Log Bins)")
+plt.xlabel("Expression Sum (Log Scale)")
+plt.ylabel("Number of Genes (Log Scale)")
+# Fig3 KDE
+plt.subplot(1, 3, 3)
+sns.kdeplot(expression_sum, fill=True, color="blue", bw_adjust=2.5)
+plt.xscale("log")
+plt.title("Kernel Density Estimate of Gene Expression Sums")
+plt.xlabel("Expression Sum")
+plt.ylabel("Density")
+# 显示图表
+plt.tight_layout()
+plt.show()
+import pandas as pd
+expression_sum = df["expression_sum"]
+# use numpy.linspace seperate them averagly
+bins = np.linspace(0, 2230000, 11) # 10 bins
+# pandas cut allocate them(expression_sum)
+category = pd.cut(expression_sum, bins)
+# count num for each bin
+count = pd.value_counts(category)
+print(count)
+#know more since (0.0, 223000.0] is 22186
+import pandas as pd
+bins = [0, 1000, 5000, 10000, 20000, 50000, 100000, 223000] # set bins
+labels = ["(0, 1000]", "(1000, 5000]", "(5000, 10000]", "(10000, 20000]", "(20000, 50000]", "(50000, 100000]", "(100000, 223000]"] # mark bins
+# cut function allocate them(expression_sum)
+df['expression_sum_category'] = pd.cut(df['expression_sum'], bins=bins, labels=labels, right=True)
+# count their num for each bin
+category_counts = df['expression_sum_category'].value_counts()
+# print
+print(category_counts)
+#since (0, 1000] 15835----know more about 0-1k
+bins_0_1000 = list(range(0, 1001, 100)) # 0-100-200-300-,,,1k
+labels_0_1000 = [f"({i}, {i+100}]" for i in range(0, 1000, 100)] # mark for each bin
+df['expression_sum_0_1000_category'] = pd.cut(df['expression_sum'], bins=bins_0_1000, labels=labels_0_1000, right=False)
+category_counts_0_1000 = df['expression_sum_0_1000_category'].value_counts()
+print("\n0-1000区间基因数量按每100为一段进行划分：")
+print("\n0-1000seperate by 100 for each bin：")
+print(category_counts_0_1000)
+import matplotlib.pyplot as plt
+# bar chart
+plt.figure(figsize=(10, 6))
+plt.bar(category_counts_0_1000.index, category_counts_0_1000.values, color='skyblue', edgecolor='black')
+plt.title('Gene Count Distribution in 0-1000 Expression Sum Range')
+plt.xlabel('Expression Sum Range (0-1000)')
+plt.ylabel('Gene Count')
+plt.xticks(rotation=45)
+plt.show()
+#test for mean
+# select expression_mean
+expression_mean = df["expression_mean"]
+# barchart
+plt.figure(figsize=(10, 6))
+plt.hist(expression_mean, bins=100, color="blue", alpha=0.7)
+plt.title("Distribution of Gene Expression Means")
+plt.yscale("log") # log-y
+plt.xlabel("Expression Mean")
+plt.ylabel("Number of Genes")
+plt.show()

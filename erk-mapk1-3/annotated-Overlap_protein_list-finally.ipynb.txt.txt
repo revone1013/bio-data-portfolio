@@ -1,0 +1,105 @@
+!pip install pandas biopython
+#for igps prediction also, only keep sp if needed
+#this is for csv or xlsx
+#xlsx: df = pd.read.excel(file)
+#csv: df = pd.read.csv()
+import pandas as pd
+# Load the Excel file
+df = pd.read_excel("6m.xlsx")
+# Apply filters:
+# 1. 'ID' starts with 'sp|'
+# 2. 'Kinase' is 'ERK1' or 'ERK2'
+filtered_df = df[df['ID'].str.startswith('sp|') & df['Kinase'].isin(['ERK1', 'ERK2'])]
+# Save the filtered result
+filtered_df.to_excel("filtered_6m_igps_sp.xlsx", index=False)
+#only keep sp for fasta if needed
+#for fasta download from Uniprot
+def filter_sp_fasta(input_file, output_file):
+with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
+keep = False
+for line in infile:
+if line.startswith('>'):
+keep = line.startswith('>sp')
+if keep:
+outfile.write(line)
+# Usage
+filter_sp_fasta("idmapping_2025_04_30.fasta", "filtered_sp_only_for_6m_over_100.fasta")
+#basic view by Venn to see the overlap
+#docking
+import pandas as pd
+import re
+# Load the docking domain results
+df_docking = pd.read_csv("docking_domain_sp_results_with_patterns.csv")
+# Filter docking domain results to only keep rows with 'Match' in 'Docking_Domain_Status'
+df_docking_filtered = df_docking[df_docking['Docking_Domain_Status'] == 'Match']
+# Extract protein identifiers from the Description column
+def extract_protein_id(description):
+# Rextract protein ID
+# A0A0R4J132 in tr|A0A0R4J132|A0A0R4J132_MOUSE
+match = re.search(r'\|([A-Za-z0-9]+)\|', description)
+if match:
+return match.group(1)
+return None
+# Apply the function to extract protein identifiers and create a new column Protein_ID
+df_docking_filtered['Protein_ID'] = df_docking_filtered['Description'].apply(extract_protein_id)
+# Remove rows where 'Protein_ID' is None
+# (in case there are any rows without a protein identifier)
+df_docking_filtered = df_docking_filtered.dropna(subset=['Protein_ID'])
+# Get unique proteins from docking domain results
+docking_domain_proteins = df_docking_filtered['Protein_ID'].unique()
+print(docking_domain_proteins)
+len(docking_domain_proteins)
+#igps
+# Load iGPS data
+df_igps = pd.read_excel("100_sp_igps_ERK12_filtered_1m.xlsx")
+# Extract protein identifiers from the ID
+def extract_protein_id_igps(igps_id):
+# Rextract protein ID
+# A0A0R4J132 in tr|A0A0R4J132|A0A0R4J132_MOUSE
+match = re.search(r'\|([A-Za-z0-9]+)\|', igps_id)
+if match:
+return match.group(1)
+return None
+# Apply the function to extract protein identifiers from ID column
+df_igps['Protein_ID'] = df_igps['ID'].apply(extract_protein_id_igps)
+# Get unique proteins from iGPS results
+igps_proteins = df_igps['Protein_ID'].unique()
+print(igps_proteins)
+len(igps_proteins)
+#venn
+!pip install matplotlib-venn
+import matplotlib.pyplot as plt
+from matplotlib_venn import venn2
+# Convert them into sets for comparison
+# p.s. in many case set list tuple should be treated seriously as some functions only accept set/list or error will occur
+igps_proteins_set = set(igps_proteins)
+docking_domain_proteins_set = set(docking_domain_proteins)
+# Find the overlap (intersection)
+overlap = igps_proteins_set.intersection(docking_domain_proteins_set)
+# Find unique proteins in each set
+unique_docking = docking_domain_proteins_set - overlap
+unique_igps = igps_proteins_set - overlap
+# Create a Venn diagram with two sets
+venn2(subsets=(len(unique_docking), len(unique_igps), len(overlap)),
+set_labels=('Docking Domain Results', 'iGPS Results'))
+# Add title
+plt.title("Venn Diagram of Overlapping and Unique Proteins for 6m")
+# Display the plot
+plt.show()
+# Print results
+print(f"Number of overlapping proteins: {len(overlap)}")
+print(f"Number of unique proteins in Docking Domain Results: {len(unique_docking)}")
+print(f"Number of unique proteins in iGPS Results: {len(unique_igps)}")
+#merge 2 list based on overlapping part
+#only for Unipro ID like Q1234
+overlap_list = list(overlap) # transfer to list
+# save to txt
+# pro A
+# por B
+#...
+with open("overlapping_proteins_list.txt", "w") as f:
+for protein in overlap_list:
+f.write(f"{protein}\n")
+print(f"save to overlapping_proteins_list.txt，totall {len(overlap_list)} unique protein")
+#further
+# Uniprot ID----matched in protein sequence---generate list with protein name---ORA GO

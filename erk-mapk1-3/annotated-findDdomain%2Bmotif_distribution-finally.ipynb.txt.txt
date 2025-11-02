@@ -1,0 +1,416 @@
+# Function to convert a .txt file to .fasta format if needed
+#p.s: in many part, some unnecessary functions like this will be included for convenience as I somtimes may forget the form of input
+#so some files will contain how to read csv or xlsx file, some may contain txt-fasta
+def txt_to_fasta(txt_file, fasta_file):
+with open(txt_file, 'r') as txt, open(fasta_file, 'w') as fasta:
+# Read each line in the txt file
+for line in txt:
+# Assume each line is a sequence (if you have headers, modify accordingly)
+# Example: >Olig2
+if line.startswith(">"):
+# Add header (with '>' at the beginning) to the fasta file
+fasta.write(line)
+else:
+# Write sequence data
+fasta.write(line.strip() + '\n')
+# Example usage
+txt_file = 'input_sequences.txt'
+fasta_file = 'output_sequences.fasta' #
+txt_to_fasta(txt_file, fasta_file)
+print("Conversion complete!")
+!pip install pandas biopython
+#docking searching
+import re
+from Bio import SeqIO
+# Load the FASTA file
+fasta_file = "idmapping_2025_03_13.fasta" # Replace with your actual file path
+# Define the pattern12 docking search
+pattern_1 = r"[KR][KR][KR].{1,5}[LI].[LI]" # K/R-K/R-K/R-X(1-5)-L/I-X-L/I
+pattern_2 = r"[KR].[KR][KR].{1,4}[LI].[LI]" # K/R-X-X/K/R-K/R-X(1-4)-L/I-X-L/I
+# Function to check which pattern matches and store pattern result
+# seq+match/no match+position+around seq
+def check_docking_domain(sequence):
+"""
+Check a protein sequence for docking domain patterns.
+Parameters:
+sequence (str): Protein sequence to be scanned.
+Returns:
+tuple: status ('Match'/'No Match'/'Invalid'),
+matched sequences (str separated by '|'),
+matched positions (str separated by '|'),
+matched pattern types (str separated by '|').
+...
+"""
+if not isinstance(sequence, str) or not sequence.strip():
+return "Invalid", None, None, None # Handle missing or incorrect data
+# Search for pattern 1
+matches_1 = list(re.finditer(pattern_1, sequence))
+# Search for pattern 2
+matches_2 = list(re.finditer(pattern_2, sequence))
+matched_sequences = []
+matched_positions = []
+matched_patterns = []
+# Record matches for pattern 1
+for match in matches_1:
+matched_sequences.append(match.group())
+matched_positions.append(match.start() + 1) # 1-based indexing
+matched_patterns.append("Pattern 1")
+# Record matches for pattern 2
+for match in matches_2:
+# Avoid duplicate matches (e.g., if a sequence matches both patterns)
+if match.group() not in matched_sequences:
+matched_sequences.append(match.group())
+matched_positions.append(match.start() + 1) # 1-based indexing
+matched_patterns.append("Pattern 2")
+if matched_sequences:
+return "Match", "|".join(matched_sequences), "|".join(map(str, matched_positions)), "|".join(matched_patterns)
+else:
+return "No Match", None, None, None
+# Parse the FASTA file and check each sequence
+results = []
+for record in SeqIO.parse(fasta_file, "fasta"):
+description = record.description
+sequence = str(record.seq)
+status, matched_sequences, matched_positions, matched_patterns = check_docking_domain(sequence)
+results.append({
+"Description": description,
+"Protein Sequence": sequence,
+"Docking_Domain_Status": status,
+"Matched_Sequences": matched_sequences,
+"Matched_Positions": matched_positions,
+"Matched_Patterns": matched_patterns
+})
+# Convert results to a DataFrame
+import pandas as pd
+df = pd.DataFrame(results)
+# Save the results to a CSV file
+output_csv = "docking_domain_results_with_patterns.csv"
+df.to_csv(output_csv, index=False)
+# Print the results
+print(df.head())
+#b4 plotting them, when generating result above
+#one thing is that if proA has pattern match
+#it will show results like pro, whole seq, matched seq, matched positions(start), match pattern(1/2)
+#not the form like Pattern 1|Pattern 2 this can help me know directly that pro has pattern1 and pattern 2 with 1 time each(so Pattern 2|Pattern 1)
+#will also be treated as Pattern 1|Pattern 2 for convenience
+#this part is to do the job like this
+import pandas as pd
+# Load the CSV file with the results
+input_csv = "docking_domain_results_with_patterns.csv" # Replace with your actual file path
+df = pd.read_csv(input_csv)
+# Filter rows where 'Description' starts with 'sp'
+df = df[df["Description"].str.startswith("sp", na=False)]
+# Split rows with multiple patterns into separate rows
+split_rows = []
+for _, row in df.iterrows():
+if pd.notna(row["Matched_Patterns"]):
+patterns = row["Matched_Patterns"].split("|")
+sequences = row["Matched_Sequences"].split("|")
+positions = row["Matched_Positions"].split("|")
+for pattern, sequence, position in zip(patterns, sequences, positions):
+split_rows.append({
+"Description": row["Description"],
+"Protein Sequence": row["Protein Sequence"],
+"Docking_Domain_Status": row["Docking_Domain_Status"],
+"Matched_Sequences": sequence,
+"Matched_Positions": position,
+"Matched_Patterns": pattern
+})
+else:
+split_rows.append(row.to_dict())
+# Create a new DataFrame with the split rows
+split_df = pd.DataFrame(split_rows)
+# Save the split results to a new CSV file
+split_csv = "split_docking_domain_results.csv"
+split_df.to_csv(split_csv, index=False)
+print("Split results saved to:", split_csv)
+# These are match-level counts, meaning if a single protein has 3 Pattern 1s and 2 Pattern 2s, it contributes 3 to P1 and 2 to P2.
+# So these counts represent all individual pattern occurrences.
+import pandas as pd
+#num of pattern1 and pattern2
+import matplotlib.pyplot as plt
+split_csv = "split_docking_domain_results.csv"
+# Load the split CSV file
+split_df = pd.read_csv(split_csv)
+split_df = split_df[split_df["Description"].str.startswith("sp", na=False)]
+# Count the number of matches for each pattern
+pattern_1_count = split_df[split_df["Matched_Patterns"] == "Pattern 1"].shape[0]
+pattern_2_count = split_df[split_df["Matched_Patterns"] == "Pattern 2"].shape[0]
+# Print the counts
+print(f"Pattern 1 matches: {pattern_1_count}")
+print(f"Pattern 2 matches: {pattern_2_count}")
+# Plot the distribution
+patterns = ["Pattern 1", "Pattern 2"]
+counts = [pattern_1_count, pattern_2_count]
+# Get the current y-axis limits
+ymin, ymax = plt.ylim()
+# Add text labels above the bars
+for i, count in enumerate(counts):
+plt.text(i, count + (ymax - ymin) * 0.02, str(count), ha='center', va='bottom', fontsize=12)
+plt.bar(patterns, counts, color=["blue", "orange"])
+plt.xlabel("Pattern")
+plt.ylabel("Number of Matches")
+plt.title("Distribution of Docking Domain Pattern Matches")
+plt.show()
+#see types of matches
+import pandas as pd
+# Load the CSV file with the results
+input_csv = "docking_domain_sp_results_with_patterns.csv" # Replace with your actual file path
+df = pd.read_csv(input_csv)
+# Count the occurrences of each match type
+match_types = df["Matched_Patterns"].value_counts().to_dict()
+# Print the match types and their counts
+print("Match Types and Counts:")
+for match_type, count in match_types.items():
+print(f"{match_type}: {count}")
+#need more
+#1. solely 1, solely 2, both
+#directly match one time(pattern1,), 2 times(12,22,11...)...
+import pandas as pd
+# Load your CSV file
+input_csv = "docking_domain_sp_results_with_patterns.csv"
+df = pd.read_csv(input_csv)
+# Filter only rows with a docking domain match
+matched_df = df[df["Docking_Domain_Status"] == "Match"]
+# Further filter to only 'sp|' proteins from the 'Description' column
+matched_df = matched_df[matched_df["Description"].str.startswith("sp|", na=False)]
+# Extract unique protein IDs (e.g., sp|P12345|XXX_HUMAN → sp|P12345|)
+# You may adjust this regex depending on your data format
+unique_proteins = matched_df["Description"].str.extract(r'^(sp\|[^\|]+\|)')[0].dropna().unique()
+# Count them
+num_unique_proteins_with_match = len(unique_proteins)
+print(f"Number of unique 'sp|' proteins with a docking domain match: {num_unique_proteins_with_match}")
+#1. solely 1, solely 2, both
+import matplotlib.pyplot as plt
+import pandas as pd
+# Load the CSV file
+input_csv = "docking_domain_sp_results_with_patterns.csv" # Replace with your actual file path
+df = pd.read_csv(input_csv)
+# Count occurrences of each match type
+match_types = df["Matched_Patterns"].value_counts().to_dict()
+# Categorize proteins
+only_pattern_1 = sum(count for pattern, count in match_types.items() if 'Pattern 2' not in pattern)
+only_pattern_2 = sum(count for pattern, count in match_types.items() if 'Pattern 1' not in pattern)
+both_patterns = sum(count for pattern, count in match_types.items() if 'Pattern 1' in pattern and 'Pattern 2' in pattern)
+# Data for the plot
+categories = ['Only Pattern 1', 'Only Pattern 2', 'Both Patterns']
+counts = [only_pattern_1, only_pattern_2, both_patterns]
+# Plot
+plt.figure(figsize=(8, 6))
+plt.bar(categories, counts, color=['blue', 'red', 'purple'])
+# Labels and title
+plt.xlabel("Pattern Category")
+plt.ylabel("Number of Proteins")
+plt.title("Distribution of Proteins by Pattern Matches")
+# Show count on bars
+for i, v in enumerate(counts):
+plt.text(i, v + ymax * 0.02, str(v), ha='center', fontsize=12)
+# Display plot
+plt.show()
+import matplotlib.pyplot as plt
+pattern_counts = {
+'Pattern 1': 918,
+'Pattern 2': 631,
+'Pattern 1|Pattern 2': 182,
+'Pattern 1|Pattern 1': 59,
+'Pattern 2|Pattern 2': 24,
+'Pattern 1|Pattern 1|Pattern 2': 19,
+'Pattern 1|Pattern 2|Pattern 2': 17,
+'Pattern 1|Pattern 1|Pattern 1': 8,
+'Pattern 1|Pattern 1|Pattern 1|Pattern 2': 3,
+'Pattern 1|Pattern 1|Pattern 1|Pattern 1|Pattern 1|Pattern 2|Pattern 2|Pattern 2': 1,
+'Pattern 1|Pattern 1|Pattern 1|Pattern 1|Pattern 2': 1,
+'Pattern 1|Pattern 1|Pattern 2|Pattern 2': 1,
+}
+# rank
+sorted_items = sorted(pattern_counts.items(), key=lambda x: x[1], reverse=True)
+labels, counts = zip(*sorted_items)
+# plot
+plt.figure(figsize=(10, 6))
+plt.barh(labels, counts, color="skyblue", edgecolor="black")
+plt.xlabel("Count")
+plt.title("Motif Match Patterns and Their Frequencies")
+plt.gca().invert_yaxis() # 最高频在最上面
+plt.tight_layout()
+plt.show()
+import matplotlib.pyplot as plt
+import pandas as pd
+# Dictionary of match types and counts
+match_types_counts = {
+'Pattern 1': 918,
+'Pattern 2': 631,
+'Pattern 1|Pattern 2': 182,
+'Pattern 1|Pattern 1': 59,
+'Pattern 2|Pattern 2': 24,
+'Pattern 1|Pattern 1|Pattern 2': 19,
+'Pattern 1|Pattern 2|Pattern 2': 17,
+'Pattern 1|Pattern 1|Pattern 1': 8,
+'Pattern 1|Pattern 1|Pattern 1|Pattern 2': 3,
+'Pattern 1|Pattern 1|Pattern 1|Pattern 1|Pattern 1|Pattern 2|Pattern 2|Pattern 2': 1,
+'Pattern 1|Pattern 1|Pattern 1|Pattern 1|Pattern 2': 1,
+'Pattern 1|Pattern 1|Pattern 2|Pattern 2': 1,
+}
+# Count the number of matches per protein
+match_distribution = {}
+for pattern, count in match_types_counts.items():
+num_matches = pattern.count("Pattern 1") + pattern.count("Pattern 2") # Count total matches
+match_distribution[num_matches] = match_distribution.get(num_matches, 0) + count
+# Sort the distribution by match count
+sorted_match_counts = sorted(match_distribution.items()) # List of (num_matches, count)
+# Extract X (number of matches) and Y (number of proteins)
+x_values, y_values = zip(*sorted_match_counts)
+# Plot
+plt.figure(figsize=(8, 6))
+plt.bar(x_values, y_values, color='skyblue')
+# Labels and title
+plt.xlabel("Number of Matches per Protein")
+plt.ylabel("Number of Proteins")
+plt.title("Distribution of Proteins by Number of Matches")
+# Show count on bars
+for i, v in enumerate(y_values):
+plt.text(x_values[i], v + 10, str(v), ha='center', fontsize=12)
+# Display plot
+plt.show()
+import seaborn as sns
+import numpy as np
+# Create a 2D matrix where (i, j) represents proteins with i Pattern 1 and j Pattern 2
+heatmap_data = {}
+for pattern, count in match_types_counts.items():
+num_p1 = pattern.count("Pattern 1")
+num_p2 = pattern.count("Pattern 2")
+heatmap_data[(num_p1, num_p2)] = heatmap_data.get((num_p1, num_p2), 0) + count
+# Convert to 2D matrix
+max_p1 = max(k[0] for k in heatmap_data.keys()) + 1
+max_p2 = max(k[1] for k in heatmap_data.keys()) + 1
+heatmap_matrix = np.zeros((max_p1, max_p2))
+for (p1, p2), count in heatmap_data.items():
+heatmap_matrix[p1, p2] = count
+# Plot the heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(heatmap_matrix, annot=True, fmt=".0f", cmap="Blues")
+plt.xlabel("Number of Pattern 2 Matches")
+plt.ylabel("Number of Pattern 1 Matches")
+plt.title("Motif Co-occurrence Heatmap")
+plt.show()
+# Count categories
+solely_p1 = sum(count for pattern, count in match_types_counts.items() if "Pattern 2" not in pattern)
+solely_p2 = sum(count for pattern, count in match_types_counts.items() if "Pattern 1" not in pattern)
+both_p1_p2 = sum(count for pattern, count in match_types_counts.items() if "Pattern 1" in pattern and "Pattern 2" in pattern)
+# Pie chart labels and data
+labels = ["Solely Pattern 1", "Solely Pattern 2", "Both Patterns"]
+sizes = [solely_p1, solely_p2, both_p1_p2]
+# Plot pie chart
+plt.figure(figsize=(7, 7))
+plt.pie(sizes, labels=labels, autopct="%1.1f%%", colors=["skyblue", "orange", "green"], startangle=140)
+plt.title("Motif Distribution Among Proteins")
+plt.show()
+# Count repeat occurrences
+repeat_counts = {}
+#no int---so x axis will 0-0.5-1-1.5....
+for pattern, count in match_types_counts.items():
+max_repeats = max(pattern.count("Pattern 1"), pattern.count("Pattern 2"))
+repeat_counts[max_repeats] = repeat_counts.get(max_repeats, 0) + count
+# Sort and plot
+x_values, y_values = zip(*sorted(repeat_counts.items()))
+plt.figure(figsize=(8, 6))
+plt.plot(x_values, y_values, marker="o", linestyle="-", color="purple")
+plt.xlabel("Number of Times a Motif is Repeated in a Protein")
+plt.ylabel("Number of Proteins")
+plt.title("Motif Repeat Distribution")
+plt.grid(True)
+plt.show()
+# Count repeat occurrences
+repeat_counts = {}
+for pattern, count in match_types_counts.items():
+max_repeats = int(max(pattern.count("Pattern 1"), pattern.count("Pattern 2")))
+repeat_counts[max_repeats] = repeat_counts.get(max_repeats, 0) + count
+# Sort and plot
+x_values, y_values = zip(*sorted(repeat_counts.items()))
+plt.figure(figsize=(8, 6))
+plt.plot(x_values, y_values, marker="o", linestyle="-", color="purple")
+plt.xlabel("Number of Times a Motif is Repeated in a Protein")
+plt.ylabel("Number of Proteins")
+plt.title("Motif Repeat Distribution")
+plt.grid(True)
+plt.xticks(range(int(min(x_values)), int(max(x_values)) + 1)) # Force integer x-ticks
+plt.show()
+print(df.columns)#check name of column
+df.columns = df.columns.str.strip() # Removes leading/trailing spaces from column names
+df = pd.read_csv(input_csv, delimiter=",") # Use ',' for comma-separated values
+print(df.head()) # Print first few rows to check data structure
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+# Load the CSV file
+input_csv = "docking_domain_sp_results_with_patterns.csv" # Replace with your actual file path
+df = pd.read_csv(input_csv, delimiter=",", header=0)
+# Filter rows where 'Docking_Domain_Status' is 'Match'
+df_filtered = df[df['Docking_Domain_Status'] == 'Match']
+# Check if 'Matched_Positions' is not NaN
+df_filtered = df_filtered.dropna(subset=['Matched_Positions'])
+# Convert 'Matched_Positions' column into a list of integers
+df_filtered["Matched_Positions"] = df_filtered["Matched_Positions"].astype(str).apply(lambda x: [int(pos) for pos in x.split("|")])
+# Define the protein sequence length for each entry (assuming it's available in 'Protein Sequence')
+df_filtered["Protein_Length"] = df_filtered["Protein Sequence"].apply(len)
+# Initialize a list to store the relative positions of motifs in terms of percentage
+relative_positions = []
+# For each protein, calculate the relative position of each matched motif
+for _, row in df_filtered.iterrows():
+protein_length = row["Protein_Length"]
+for pos in row["Matched_Positions"]:
+# Calculate the start position percentage of the motif
+relative_position = (pos / protein_length) * 100
+relative_positions.append(relative_position)
+# Define the bins for position ranges (0-10%, 10-20%, ..., 90-100%)
+bins = np.arange(0, 110, 10)
+bin_labels = [f"{i}-{i+10}%" for i in bins[:-1]]
+# Count how many motifs fall into each bin
+position_counts, _ = np.histogram(relative_positions, bins=bins)
+# Plot the distribution
+plt.figure(figsize=(10, 6))
+plt.bar(bin_labels, position_counts, color="skyblue", edgecolor="black", alpha=0.7)
+plt.xlabel("Motif Position Range in Protein Sequence (Percentage)")
+plt.ylabel("Number of Matches")
+plt.title("Distribution of Motif Positions in Protein Sequences (Relative Percentages)")
+plt.xticks(rotation=45)
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.show()
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import gaussian_kde
+# Load the CSV file
+input_csv = "docking_domain_sp_results_with_patterns.csv" # Replace with your actual file path
+df = pd.read_csv(input_csv, delimiter=",", header=0)
+# Filter rows where 'Docking_Domain_Status' is 'Match'
+df_filtered = df[df['Docking_Domain_Status'] == 'Match']
+# Check if 'Matched_Positions' is not NaN
+df_filtered = df_filtered.dropna(subset=['Matched_Positions'])
+# Convert 'Matched_Positions' column into a list of integers
+df_filtered["Matched_Positions"] = df_filtered["Matched_Positions"].astype(str).apply(lambda x: [int(pos) for pos in x.split("|")])
+# Define the protein sequence length for each entry (assuming it's available in 'Protein Sequence')
+df_filtered["Protein_Length"] = df_filtered["Protein Sequence"].apply(len)
+# Initialize a list to store the relative positions of motifs in terms of percentage
+relative_positions = []
+# For each protein, calculate the relative position of each matched motif
+for _, row in df_filtered.iterrows():
+protein_length = row["Protein_Length"]
+for pos in row["Matched_Positions"]:
+# Calculate the start position percentage of the motif
+relative_position = (pos / protein_length) * 100
+relative_positions.append(relative_position)
+# Create a Kernel Density Estimate (KDE) to plot a smooth curve
+kde = gaussian_kde(relative_positions, bw_method=0.1) # Adjust bandwidth for smoothness
+# Define a range of values (from 0 to 100) to evaluate the KDE
+x_vals = np.linspace(0, 100, 1000)
+# Evaluate the KDE on the x_vals
+y_vals = kde(x_vals)
+# Plot the smooth curve
+plt.figure(figsize=(10, 6))
+plt.plot(x_vals, y_vals, color="purple", linewidth=2)
+plt.fill_between(x_vals, y_vals, color="purple", alpha=0.3)
+plt.xlabel("Motif Position in Protein Sequence (Percentage)")
+plt.ylabel("Density")
+plt.title("Smooth Distribution of Motif Positions in Protein Sequences (Relative Percentages)")
+plt.grid(True, linestyle="--", alpha=0.7)
+plt.show()

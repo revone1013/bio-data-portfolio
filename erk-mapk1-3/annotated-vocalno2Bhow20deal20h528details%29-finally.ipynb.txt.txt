@@ -1,0 +1,139 @@
+#vocalno plot
+!pip install h5py biopython pandas
+#in vocalno plot we cannot use sum or mean of count
+#instead, we need to know counts in each cells with barcodes
+#so shape, how to deal with this is quite important
+import h5py
+import scipy.sparse as sp
+import pandas as pd
+import numpy as np
+def load_h5_to_matrix(file_path):
+with h5py.File(file_path, 'r') as f:
+data = f['/matrix/data'][:]
+indices = f['/matrix/indices'][:]
+indptr = f['/matrix/indptr'][:]
+# Correct shape: (n_cells, n_genes)
+# here, the shape is manually set but in h5_gene_expression(1m) -finally.ipynb, it si due to different num of shape value
+# so here shape = (gene, cell) (supposed) are changed into (cell, gene) to fit this matrix
+# in the future if needed, the value here will not be a specific num but parameter (cell, gene) according to indptr
+shape = (14280, 32285)
+# Create sparse matrix in CSR (Cells × Genes)
+counts_matrix = sp.csr_matrix((data, indices, indptr), shape=shape)
+# Extract gene names and cell barcodes
+gene_names = [x.decode() for x in f['matrix/features/name'][:]]
+barcodes = [x.decode() for x in f['matrix/barcodes'][:]]
+# Convert to DataFrame (Genes × Cells)
+df = pd.DataFrame(
+counts_matrix.T.toarray(), # Now Genes × Cells
+index=gene_names,
+columns=barcodes
+)
+return df
+# load
+counts_1m = load_h5_to_matrix('GSM7021712_C_1m_filtered_feature_bc_matrix.h5')
+#Basicallyc check matrix(1m)
+with h5py.File('GSM7021712_C_1m_filtered_feature_bc_matrix.h5', 'r') as f:
+print("矩阵形状:", f['/matrix/shape'][:]) # [32285 14280]
+print("indptr长度:", len(f['/matrix/indptr'][:])) # 14281
+print("indices长度:", len(f['/matrix/indices'][:])) #17751319
+print("基因名数量:", len(f['matrix/features/name'][:])) # 32285
+print("细胞barcode数量:", len(f['matrix/barcodes'][:])) # 14280
+counts_6m = load_h5_to_matrix('GSM7021714_C_6m_filtered_feature_bc_matrix.h5')
+#Basicallyc check matrix(6m)
+with h5py.File('GSM7021714_C_6m_filtered_feature_bc_matrix.h5', 'r') as f:
+print("矩阵形状:", f['/matrix/shape'][:]) # [32285 11697]
+print("indptr长度:", len(f['/matrix/indptr'][:])) # 11698
+print("indices长度:", len(f['/matrix/indices'][:])) #16653465
+print("基因名数量:", len(f['matrix/features/name'][:])) # 32285
+print("细胞barcode数量:", len(f['matrix/barcodes'][:])) # 11697
+import h5py
+import scipy.sparse as sp
+import pandas as pd
+import h5py
+import scipy.sparse as sp
+import pandas as pd
+import numpy as np
+def load_h5_to_matrix(file_path):
+with h5py.File(file_path, 'r') as f:
+data = f['/matrix/data'][:]
+indices = f['/matrix/indices'][:]
+indptr = f['/matrix/indptr'][:]
+# Correct shape: (n_cells, n_genes)
+shape = (11697, 32285)
+# Create sparse matrix in CSR (Cells × Genes)
+counts_matrix = sp.csr_matrix((data, indices, indptr), shape=shape)
+# Extract gene names and cell barcodes
+gene_names = [x.decode() for x in f['matrix/features/name'][:]]
+barcodes = [x.decode() for x in f['matrix/barcodes'][:]]
+# Convert to DataFrame (Genes × Cells)
+df = pd.DataFrame(
+counts_matrix.T.toarray(), # Now Genes × Cells
+index=gene_names,
+columns=barcodes
+)
+return df
+# load
+counts_6m = load_h5_to_matrix('GSM7021714_C_6m_filtered_feature_bc_matrix.h5')
+#basically, check how genes may change in 1m vs 6m
+# how to get overlap (use 6m data to find_D_domain_and_match_phos_site.ipynb&iGPS prediction to get overlap to get the list Overlap protein list-finally.ipynb)
+#actually, from here, I find the overlap of docking&igps in 1m are nearly the same with that in 6m
+#suggest: the expression lv may not change too much
+# Load the overlapping genes list from the file
+overlap_genes = pd.read_csv('overlap_genes_for_16m.txt', header=None)
+overlap_genes = overlap_genes[0].tolist() # Convert to a list
+# Check if the data is loaded successfully
+print(counts_6m.head()) # Should print the first few rows of the 6m dataset
+# Filter the 1m and 6m data for overlapping genes
+counts_1m_filtered = counts_1m.loc[overlap_genes]
+counts_6m_filtered = counts_6m.loc[overlap_genes]
+# Check the filtered data
+print(counts_1m_filtered.head()) # Display the first few rows
+print(counts_6m_filtered.head()) # Display the first few rows
+counts_1m_filtered_nonzero = counts_1m_filtered.loc[(counts_1m_filtered > 0).sum(axis=1) > 0]
+counts_6m_filtered_nonzero = counts_6m_filtered.loc[(counts_6m_filtered > 0).sum(axis=1) > 0]
+print(counts_1m_filtered_nonzero.head()) # View the first few rows of the filtered 1m data
+print(counts_6m_filtered_nonzero.head()) # View the first few rows of the filtered 6m data
+print(f"Shape of 1m filtered non-zero data: {counts_1m_filtered_nonzero.shape}")
+print(f"Shape of 6m filtered non-zero data: {counts_6m_filtered_nonzero.shape}")
+overlap_genes = counts_1m_filtered_nonzero.index.intersection(counts_6m_filtered_nonzero.index)
+print(f"Number of overlapping genes: {len(overlap_genes)}")
+print("Overlapping genes:", overlap_genes)
+import numpy as np
+import pandas as pd
+from scipy import stats
+# Calculate log2 fold change
+log_fold_change = np.log2(counts_6m_filtered_nonzero.mean(axis=1) + 1) - np.log2(counts_1m_filtered_nonzero.mean(axis=1) + 1)
+# Calculate p-values using Welch’s t-test
+# We perform a t-test between the 1m and 6m groups for each gene
+p_values = []
+for gene in counts_1m_filtered_nonzero.index:
+t_stat, p_val = stats.ttest_ind(counts_1m_filtered_nonzero.loc[gene], counts_6m_filtered_nonzero.loc[gene], equal_var=False)
+p_values.append(p_val)
+# Create a DataFrame for the results
+results = pd.DataFrame({
+'log2FoldChange': log_fold_change,
+'pValue': p_values
+})
+# Correct for multiple testing (adjust p-values)
+from statsmodels.stats.multitest import multipletests
+results['pAdj'] = multipletests(results['pValue'], method='fdr_bh')[1]
+import matplotlib.pyplot as plt
+import seaborn as sns
+# Create a new column for significance (if p-adj < 0.05)
+results['significant'] = results['pAdj'] < 0.05
+# Plot the volcano plot
+plt.figure(figsize=(10, 6))
+sns.scatterplot(x='log2FoldChange', y=-np.log10(results['pAdj']), data=results, hue='significant', palette={True: 'red', False: 'gray'}, s=50, alpha=0.7)
+# Add labels and title
+plt.axhline(y=-np.log10(0.05), color='black', linestyle='--', label='p-value = 0.05')
+plt.axvline(x=0, color='black', linestyle='--')
+plt.title('Volcano Plot: Differential Expression between 1m and 6m', fontsize=16)
+plt.xlabel('Log2 Fold Change (6m vs 1m)', fontsize=14)
+plt.ylabel('-Log10 Adjusted P-Value', fontsize=14)
+plt.legend(title='Significance', loc='upper right')
+plt.show()
+#suggests that, on average, the expression of genes in 6m is slightly higher than in 1m,
+#but the difference is relatively small.
+#A log2 fold change of 0.4 corresponds to a fold change of approximately 1.32 (since log2(1.32) ≈ 0.4).
+#This means that for the genes with the highest fold change,
+#the 6m expression is about 1.32 times higher than the 1m expression.
