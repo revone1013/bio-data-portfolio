@@ -70,4 +70,4 @@ Investigation of **ERK1/2 signaling** and potential downstream **transcription f
 If you'd like to collaborate or learn more, feel free to reach out via GitHub or email.
 
 📅 **Last updated:** November 2025  
-🧑‍🔬 **Author:** Y. Wei
+
