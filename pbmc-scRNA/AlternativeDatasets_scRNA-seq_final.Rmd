@@ -1,0 +1,1122 @@
+---
+title: "Alternative datasets"
+output: html_notebook
+---
+
+Load packages
+```{r}
+library(SeuratData)
+library(Seurat)
+options(Seurat.object.assay.version = "v5")
+
+```
+#since the task for me is to use dataset1(pbmc), and there is no space in the report for brain data 
+#but I still use codes to have a basic visulizeation
+
+#Please find attached the dataset for assessment 3. 
+#Please open the project in Rstudio and use dataset 1+the data set 1 (pbmc) should be obtained using the script.
+
+
+# PBMC scRNA-seq
+
+#Download dataset
+```{r}
+options(timeout=6000)
+InstallData("pbmcsca")
+data("pbmcsca")
+pbmcsca <- UpdateSeuratObject(pbmcsca)
+```
+
+#In the practical session we subsetted pbmcsca dataset and looked at 2 batches from 10x platforms. Here we compare more platforms.
+```{r}
+pbmcsca$Method |> table()
+batchNames <- c(
+  "10x Chromium (v3)", "CEL-Seq2", "Drop-seq", "Seq-Well", "inDrops", "Seq-Well", "Smart-seq2"
+)
+pbmc <- pbmcsca[,pbmcsca$Method %in% batchNames]
+pbmc
+pbmc$Method |> table()
+batchNames <- c(
+  "10x Chromium (v3)", "CEL-Seq2", "Drop-seq", "Seq-Well", "inDrops", "Seq-Well", "Smart-seq2"
+)
+```
+```{r}
+install.packages("ggplot2")
+library(ggplot2)
+#install.packages("ggtitle")
+```
+
+#test only (since previously I want to use anchor+prediction but I think it is a manual work 
+#So I change it into IntegratLyaer)
+#In the test, just have a basic look on the number of feature+count+mit
+```{r}
+# Test to determine which method can be used as the reference:
+# Quality Control step: This block of code performs quality control 
+# checks on the single-cell RNA-seq dataset stored in the 'pbmc' object.
+
+# Calculate the percentage of mitochondrial genes for each cell
+# 'PercentageFeatureSet' function is used to compute the percentage of genes from the mitochondrial genome.
+# Mitochondrial genes typically have the prefix "MT-", so the 'pattern' argument specifies this.
+pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
+
+
+
+
+VlnPlot(pbmc, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
+        group.by = "Method") 
+#  - 'nFeature_RNA': number of features (genes) detected per cell
+#  - 'nCount_RNA': total number of RNA molecules detected per cell
+#  - 'percent.mt': percentage of mitochondrial genes per cell
+# The 'group.by' argument groups the cells by their 'Method' (batch method).  
+
+  #for a cleaner, more modern visual appearance to the plot.
+  theme_minimal()
+```
+
+#########################################
+#this is only for v3 as a reference but later it seems to be time-consuming as there are not only 1 need to be anchor and prediction
+#this codes are mainly from the practical part
+#preprocessing
+```{r}
+# Normalize it
+pbmc_10x_v3 <- subset(pbmc, subset = Method == "10x Chromium (v3)")
+pbmc_10x_v3 <- NormalizeData(pbmc_10x_v3)
+dim(pbmc_10x_v3)  # Dimensions of the v3 dataset
+# Feature Selection
+pbmc_10x_v3 <- FindVariableFeatures(pbmc_10x_v3, selection.method = "vst", nfeatures = 3000)
+# Scale it
+pbmc_10x_v3.all.genes <- rownames(pbmc_10x_v3)
+pbmc_10x_v3 <- ScaleData(pbmc_10x_v3, features = pbmc_10x_v3.all.genes)
+# Do PCA
+pbmc_10x_v3 <- RunPCA(pbmc_10x_v3, features = VariableFeatures(object = pbmc_10x_v3))
+# Draw UMAP
+pbmc_10x_v3 <- FindNeighbors(pbmc_10x_v3, dims = 1:30)
+pbmc_10x_v3 <- RunUMAP(pbmc_10x_v3, dims=1:30)
+
+DimPlot(pbmc_10x_v3, reduction = "umap", label = TRUE, group.by = 'CellType') + theme(legend.position = "none")
+```
+########################################################
+
+
+
+#this codes are mainly from the practical part
+#using pbmc_combo to perform the whole analysis
+```{r}
+pbmc_combo <- subset(pbmc, Method %in% c("10x Chromium (v3)", "CEL-Seq2", "Drop-seq", "inDrops", "Seq-Well", "Smart-seq2"))
+# Normalize it
+pbmc_combo <- NormalizeData(pbmc_combo)
+#selects genes that show high variance across cells.
+pbmc_combo <- FindVariableFeatures(pbmc_combo, selection.method = "vst", nfeatures = 3000)
+```
+
+#this codes are mainly from the practical part
+```{r}
+# normalizes the data by centering and scaling the expression levels for each gene.
+# remove technical noise and batch-specific variation
+pbmc_combo.all.genes <- rownames(pbmc_combo)
+pbmc_combo <- ScaleData(pbmc_combo, features = pbmc_combo.all.genes)
+```
+
+#this codes are mainly from the practical part
+```{r}
+# Perform Principal Component Analysis (PCA):
+# reduces the dimensionality of the data by identifying major axes of variation (principal components).
+pbmc_combo <- RunPCA(pbmc_combo, features = VariableFeatures(object = pbmc_combo))
+
+# identifies cells that are similar to each other based on the principal components (PCs) identified earlier.
+pbmc_combo <- FindNeighbors(pbmc_combo, dims = 1:30)
+
+# UMAP projects high-dimensional data into 2D or 3D space, making it easier to visualize complex relationships between cells.
+# the first 30 principal components (PCs) are used to generate the UMAP projection.
+pbmc_combo <- RunUMAP(pbmc_combo, dims = 1:30)
+```
+
+#this codes are mainly from the practical part
+```{r}
+
+# Split the RNA assay data by the 'Method'
+pbmc_combo[["RNA"]] <- split(pbmc_combo[["RNA"]], f = pbmc_combo$Method)
+
+# Normalize and scale the data:
+# 'ScaleData' normalizes the data by centering and scaling the expression levels for each gene.
+# remove technical noise and batch-specific variation
+pbmc_combo <- ScaleData(pbmc_combo)
+
+# 'FindVariableFeatures' selects genes that show high variance across cells.
+pbmc_combo <- FindVariableFeatures(pbmc_combo)
+
+# Perform Principal Component Analysis (PCA):
+# 'RunPCA' reduces the dimensionality of the data by identifying major axes of variation (principal components).
+pbmc_combo <- RunPCA(pbmc_combo)
+
+```
+
+#this codes are mainly from the practical part
+```{r}
+#plot
+DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'Method')
+DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'CellType')
+```
+
+
+#save image
+```{r}
+ggsave(filename = paste0("UMAP for pbmc before batch effect correction.png"), plot = DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'Method'), width = 10, height = 8)
+ggsave(filename = paste0("UMAP for pbmc cell type before batch effect correction.png"), plot = DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'CellType'), width = 10, height = 8)
+```
+
+
+#BE correction
+#this codes are mainly from the practical part
+#unlike the method above, IntegrateLayers will determine all things without mannually selecting a reference
+#this is also from the pratical part
+```{r}
+# Integrate multiple data layers (e.g., batches or conditions) using the Canonical Correlation Analysis (CCA) method.
+
+
+# The 'IntegrateLayers' function integrates data from different layers (or batches). 
+
+pbmc_combo <- IntegrateLayers(
+  
+
+  object = pbmc_combo,
+  
+  # CCAIntegration - Canonical Correlation Analysis (CCA),
+  # align and integrate different datasets by finding shared features.
+  method = CCAIntegration,
+  
+  
+  orig.reduction = "pca",
+  
+  
+  new.reduction = "CCA"
+)
+
+```
+
+#this codes are mainly from the practical part
+#after correction
+```{r}
+# re-join layers after integration
+pbmc_combo[["RNA"]] <- JoinLayers(pbmc_combo[["RNA"]])
+
+pbmc_combo <- FindNeighbors(pbmc_combo, dims = 1:30, reduction = "CCA")
+pbmc_combo <- RunUMAP(pbmc_combo, dims=1:30, reduction = "CCA")
+
+
+DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'Method')
+
+DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'CellType')
+
+```
+
+#save images
+```{r}
+ggsave(filename = paste0("UMAP for pbmc after batch effect correction.png"), plot = DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'Method'), width = 10, height = 8)
+ggsave(filename = paste0("UMAP for pbmc cell type after batch effect correction.png"), plot = DimPlot(pbmc_combo, reduction = "umap", label = TRUE, group.by = 'CellType'), width = 10, height = 8)
+```
+
+############################################################################################
+
+
+#further analysis after using the codes from the pratical section above
+
+#evaluate BE correction
+```{r}
+library(cluster)
+```
+
+#silhouette -1 bad
+#0 middle
+#1 perfect
+```{r}
+
+# Access the reduced representations of single-cell data
+embeddings <- Embeddings(pbmc_combo, reduction = "umap") #use umap this time
+
+# Get the CellType and Batch labels
+cell_type_labels <- pbmc_combo@meta.data$CellType  # Cell type labels
+batch_labels <- pbmc_combo@meta.data$Method  # Batch labels
+
+# Compute Silhouette Score for CellType labels
+dist_matrix <- dist(embeddings)  # Calculate distance matrix
+silhouette_celltype <- silhouette(as.numeric(as.factor(cell_type_labels)), dist_matrix)
+summary(silhouette_celltype)
+
+# Compute Silhouette Score for Batch labels
+silhouette_batch <- silhouette(as.numeric(as.factor(batch_labels)), dist_matrix)
+summary(silhouette_batch)
+```
+#optional: kEBT
+```{r}
+library(devtools)
+install_github('theislab/kBET')
+```
+```{r}
+library(kBET)
+```
+
+```{r}
+# Get the expression matrix
+expression_data <- as.data.frame(GetAssayData(pbmc_combo, assay = "RNA", slot = "data"))
+```
+
+```{r}
+# Get the batch labels from metadata
+batch_labels_method <- pbmc_combo$Method
+
+# Get the batch labels from metadata
+batch_labels_celltype <- pbmc_combo$CellType
+```
+
+
+```{r}
+dim(expression_data)  # Should return something like (number of genes x number of cells)
+```
+
+```{r}
+# Run kBET
+kbet_results <- kBET(
+  df = expression_data,
+  batch = batch_labels_method,
+  k0 = 10,  # Number of neighbors to consider
+  do.pca = TRUE,  # Perform PCA before kBET
+  dim.pca = 50,  # Number of PCA dimensions to keep
+  n_repeat = 100,  # Number of bootstrap samples
+  alpha = 0.05,  # P-value threshold
+  plot = TRUE  # Generate plots
+)
+
+```
+```{r}
+# Run kBET
+kbet_results <- kBET(
+  df = expression_data,
+  batch = batch_labels_celltype,
+  k0 = 10,  # Number of neighbors to consider
+  do.pca = TRUE,  # Perform PCA before kBET
+  dim.pca = 50,  # Number of PCA dimensions to keep
+  n_repeat = 100,  # Number of bootstrap samples
+  alpha = 0.05,  # P-value threshold
+  plot = TRUE  # Generate plots
+)
+
+
+
+```
+```
+
+
+#comfirm necessary infor for future
+```{r}
+
+# View the metadata columns
+head(pbmc_combo@meta.data)
+
+#CellType
+table(pbmc_combo$CellType)
+unique(pbmc_combo$CellType)
+
+#seurat_clusters
+table(pbmc_combo$seurat_clusters)
+unique(pbmc_combo$seurat_clusters) 
+
+```
+
+
+#and this part is for a global landscape to see the heatmap in 3.1
+```{r}
+cell_types <- unique(pbmc_combo$CellType)
+
+# Create an empty list to store markers
+cell_type_markers <- list()
+
+#find+store and rank markers
+for (cell_type in cell_types) {
+  
+  # find the markers for the current cell type
+  markers <- FindMarkers(pbmc_combo, ident.1 = cell_type)
+  
+  #Sort markers by log fold change
+  ranked_markers <- markers[order(markers$avg_log2FC, decreasing = TRUE), ]
+  
+  # store the top markers
+  cell_type_markers[[cell_type]] <- rownames(ranked_markers)[1:10]  # Top 10 markers
+  
+  # Print or inspect the top markers for each cell type
+  print(paste("Top markers for", cell_type, ":", paste(cell_type_markers[[cell_type]], collapse = ", ")))
+}
+
+#save them
+all_markers <- unique(unlist(cell_type_markers))
+```
+
+
+```{r}
+
+DoHeatmap(pbmc_combo, features = all_markers, size = 2) +  # 'size' controls the text size
+  scale_fill_viridis_c() +                                 # Add  color scale
+  theme(axis.text.x = element_text(size = 10, angle = 45, hjust = 1),  # X-axis text size and angle
+        axis.text.y = element_text(size = 4),                      # Y-axis text size
+        plot.title = element_text(size = 16))                      # Title text size
+        #plot.margin = margin(5, 5, 5, 5, "cm")                     # map size
+
+```
+
+```{r}
+#getwd()
+# Adjust the overall size when saving the plot
+Savage("heatmap.png", width = 10, height = 8, dpi = 300)  # Save a bigger heatmap with high resolution
+
+```
+
+
+
+#creat subset for heterogeneity
+```{r}
+# Subset data for specific cell types
+b_cells <- subset(pbmc_combo, subset = CellType == "B cell")
+#cd14_monocytes <- subset(pbmc_combo, subset = CellType == "CD14+ monocyte")
+#cd16_monocytes <- subset(pbmc_combo, subset = CellType == "CD16+ monocyte")
+cd4_t_cells <- subset(pbmc_combo, subset = CellType == "CD4+ T cell")
+#nk_cells <- subset(pbmc_combo, subset = CellType == "Natural killer cell")
+#dendritic_cells <- subset(pbmc_combo, subset = CellType == "Dendritic cell")
+toxic_t_cells <- subset(pbmc_combo, subset = CellType == "Cytotoxic T cell")
+#plasmacytoid_dendritic_cells <- subset(pbmc_combo, subset = CellType == "Plasmacytoid dendritic cell")
+#megakaryocytes <- subset(pbmc_combo, subset = CellType == "Megakaryocyte")
+#unassigned <- subset(pbmc_combo, subset = CellType == "Unassigned")
+
+```
+
+
+#feature plot for result 3.1
+```{r}
+#CD4+CCR7 CD4T
+#CD8AB toxic T
+#CD18 B
+#CD14 cd14mono
+FeaturePlot(pbmc_combo, features = c("CD4", "CCR7", "CD8A", "CD8B", "CD19", "CD14"))
+
+```
+
+```{r}
+ggsave(filename = paste0("FeaturePlot for targets.png"), plot = FeaturePlot(pbmc_combo, features = c("CD4", "CCR7", "CD8A", "CD8B", "CD19", "CD14")), width = 10, height = 8)
+```
+
+#This is for 3.2 heterogeneity analysis
+
+# know the subset umap
+```{r}
+# Normalize the data
+cd4_t_cells <- NormalizeData(cd4_t_cells)
+
+#identify variable features
+cd4_t_cells <- FindVariableFeatures(cd4_t_cells)
+
+#scale the data
+cd4_t_cells <- ScaleData(cd4_t_cells)
+
+#PCA for dimensional reduction
+cd4_t_cells <- RunPCA(cd4_t_cells)
+
+# run UMAP
+cd4_t_cells <- RunUMAP(cd4_t_cells, dims = 1:10)
+
+cd4_t_cells <- FindNeighbors(cd4_t_cells, dims = 1:10)
+cd4_t_cells <- FindClusters(cd4_t_cells, resolution = 0.5)  # 0.5 this time
+
+DimPlot(cd4_t_cells, reduction = "umap", label = TRUE, group.by = 'seurat_clusters') +
+  ggtitle("UMAP of CD4+ T Cells Subset")
+```
+
+
+```{r}
+ggsave(filename = paste0("UMAP for CD4 subcluster.png"), plot = DimPlot(cd4_t_cells, reduction = "umap", label = TRUE, group.by = 'seurat_clusters') +
+  ggtitle("UMAP of CD4+ T Cells Subset"), width = 10, height = 8)
+```
+
+
+#for using pipline %>%
+```{r}
+library(dplyr)
+```
+
+#find top10 gene to know different functions in each cluster in each cell type
+```{r}
+# Find markers
+cd4_t_cells_markers <- FindAllMarkers(cd4_t_cells, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+#top 10 markers
+top_cd4_t_cells_markers <- cd4_t_cells_markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC)
+
+# View top markers
+#print(top_b_cell_markers)
+```
+
+
+```{r}
+# scanning each cultser for a look
+markers_cluster <- cd4_t_cells_markers %>% filter(cluster == "3")  # Change the cluster number as needed
+print(markers_cluster)
+
+```
+
+#This is record of the highly expressed genes/markers
+#we hope to find a gene will only express in a cluster to find its unique function
+```{r}
+# Identify markers
+cd4_t_cells_markers <- FindAllMarkers(cd4_t_cells, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+
+# Get top 10 markers 
+top_cd4_t_cells_markers <- cd4_t_cells_markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) %>%
+    ungroup()  # Ensure the grouping does not persist
+
+# generate FeaturePlots for top markers in each group
+for (cluster in unique(top_cd4_t_cells_markers$cluster)) {
+  
+  # Filter for the top markers of the current cluster
+  markers_cluster <- top_cd4_t_cells_markers %>% 
+    filter(cluster == !!cluster)  # Ensure correct variable scoping with '!!'
+  
+  # Only get unique top markers
+  unique_markers <- unique(markers_cluster$gene)  
+  # Check if we have more than 10 unique markers
+  if (length(unique_markers) > 10) {
+    unique_markers <- unique_markers[1:10]  # Take only the first 10
+  }
+
+
+  # Generate FeaturePlots for each top marker
+  for (marker in unique_markers) {
+    p <- FeaturePlot(cd4_t_cells, features = marker, 
+                     pt.size = 1,  
+                     cols = c("lightgrey", "blue"))  
+                    
+    # Add title with gene and cluster information
+    p <- p + ggtitle(paste("Feature Plot for", marker, "in Cluster", cluster))
+    # Print the plot
+    print(p)
+    # Uncomment below to save the plots as images
+    # ggsave(paste0("FeaturePlot_", marker, "_Cluster_", cluster, ".png"), plot = p)
+  }
+}
+
+```
+
+#improve:
+#setting a whole function for use from subset umap to potential unique markers
+```{r}
+# Define the function
+analyze_cells <- function(seurat_object) {
+  # Normalize the data
+  seurat_object <- NormalizeData(seurat_object)
+  
+  # Identify variable features
+  seurat_object <- FindVariableFeatures(seurat_object)
+  
+  # Scale the data
+  seurat_object <- ScaleData(seurat_object)
+  
+  # Perform PCA for dimensional reduction
+  seurat_object <- RunPCA(seurat_object)
+  
+  # Run UMAP
+  seurat_object <- RunUMAP(seurat_object, dims = 1:10)
+  
+  # Find neighbors and clusters
+  seurat_object <- FindNeighbors(seurat_object, dims = 1:10)
+  seurat_object <- FindClusters(seurat_object, resolution = 0.5)  # Default resolution
+  
+  # Extract the unique cell type from the metadata
+  cell_type <- unique(seurat_object$CellType) 
+  cell_type <- paste(cell_type, collapse = ", ")  # Concatenate if there are multiple types
+  
+  #subset UMAP visualization
+  #umap_plot <- DimPlot(seurat_object, reduction = "umap", label = TRUE, group.by = 'seurat_clusters') +
+  #  ggtitle(paste("UMAP of", cell_type, "Subsets"))
+  #ggsave(paste0(cell_type, "subcluster.png"), plot = umap_plot)
+  
+  #print(umap_plot)  # Print the UMAP plot
+  
+  # Identify markers
+  t_cells_markers <- FindAllMarkers(seurat_object, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+  
+  # Get top 10 markers for each cluster
+  top_t_cells_markers <- t_cells_markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) %>%
+    ungroup()  # Ensure the grouping does not persist
+  
+  # Loop through each cluster to generate FeaturePlots for top markers
+  for (cluster in unique(top_t_cells_markers$cluster)) {
+    # Filter for the top markers of the current cluster
+    markers_cluster <- top_t_cells_markers %>% 
+      filter(cluster == !!cluster)  # Ensure correct variable scoping with '!!'
+    
+    # Only get unique top markers
+    unique_markers <- unique(markers_cluster$gene)
+    
+    # Generate FeaturePlots for each top marker
+    for (marker in unique_markers) {
+      p <- FeaturePlot(seurat_object, features = marker, 
+                       pt.size = 1,  # Adjust point size as needed
+                       cols = c("lightgrey", "blue"))  # Change color palette as needed
+      
+      # Add title
+      p <- p + ggtitle(paste(marker))
+      
+      # Print the plot
+      #print(p)
+      
+      ggsave(paste0(marker, ".png"), plot = p)
+    }
+  }
+  
+  # Return a summary of results
+  #summary_results <- list(
+  #  UMAP_Plot = umap_plot,
+  #  Top_Markers = top_t_cells_markers
+  #return(summary_results)  # Return summary results
+}
+```
+
+
+```{r}
+toxic_t_cells <- subset(pbmc_combo, subset = CellType == "Cytotoxic T cell")
+results <- analyze_cells(toxic_t_cells)
+
+```
+
+
+#save
+```{r}
+#B
+ggsave(filename = paste0("FeaturePlot for B subclusters.png"), plot = FeaturePlot(b_cells, features = c("SLC25A37", "FAM81B", "PRKAA2","RPL36A", "JUND", "KLF6", "NFKBID", "SLC26A4" )), width = 20, height = 16)
+
+```
+
+```{r}
+#CD4
+ggsave(filename = paste0("FeaturePlot for CD4 subclusters.png"), plot = FeaturePlot(cd4_t_cells, features = c("PRKAA2", "GOLGA6A", "NRDE2","JUND", "GRASP", "CST7", "APBA2", "PPIAL4A", "OPHN1" )), width = 20, height = 16)
+```
+
+
+```{r}
+#CD8
+ggsave(filename = paste0("FeaturePlot for Cytotoxic T subclusters.png"), plot = FeaturePlot(toxic_t_cells, features ="PRKAA2" ), width = 10, height = 8)d
+
+#c("PRKAA2" "JUND", "GZMM","GOLGA6A", "NRDE2", "OPHN1", "FAM180B")
+```
+
+
+
+
+#This is for unassigned cluster. We can see if there is sth valuable but most of them are lncRNA
+```{r}
+una_markers <- FindMarkers(pbmc_combo, ident.1 = "Unassigned", min.pct = 0.25)
+una_ranked_markers <- una_markers[order(una_markers$avg_log2FC, decreasing = TRUE), ]
+print(una_ranked_markers)
+
+una_cell_type_markers <- rownames(una_ranked_markers)[1:10]  # Top 10 markers
+
+print(paste("Top markers for UNA:", paste(una_cell_type_markers, collapse = ", ")))
+```
+
+
+
+#This part is to generate each cell type UMAP and heatmap of high expression genes which has been mentioned and treated as limited use
+#since highly express gene is not equal to makers, not unique finctions
+#only success before turning to NK/mega cell as the heatmap cannot be generated
+```{r}
+# Get unique cell types
+cell_types <- unique(pbmc_combo$CellType)
+
+# Create a list to store results for each cell type
+subcluster_results <- list()
+
+# Loop over each cell type
+for (cell_type in cell_types) {
+  cat("Processing:", cell_type, "\n")
+  
+  # Subset the Seurat object for the current cell type
+  cell_type_subset <- subset(pbmc_combo, idents = cell_type)
+  
+  # Normalize, find variable features, scale the data
+  cell_type_subset <- NormalizeData(cell_type_subset)
+  cell_type_subset <- FindVariableFeatures(cell_type_subset)
+  cell_type_subset <- ScaleData(cell_type_subset)
+  
+  # Run PCA
+  cell_type_subset <- RunPCA(cell_type_subset, verbose = FALSE)
+  
+  # Find neighbors and cluster within the subset
+  cell_type_subset <- FindNeighbors(cell_type_subset, dims = 1:10)
+  cell_type_subset <- FindClusters(cell_type_subset, resolution = 0.5)  # Adjust resolution as needed
+  
+  # Run UMAP to visualize subclusters
+  cell_type_subset <- RunUMAP(cell_type_subset, dims = 1:10)
+  
+  # Store the UMAP plot for subclusters in the results list
+  umap_plot <- DimPlot(cell_type_subset, reduction = "umap", group.by = "seurat_clusters") +
+               ggtitle(paste("UMAP of Subclusters in", cell_type))
+  
+  # Find markers for each subcluster
+  subcluster_markers <- FindAllMarkers(cell_type_subset)
+  
+  # Store the top markers for each subcluster in the results list
+  top_markers <- subcluster_markers %>% group_by(cluster) %>% top_n(n = 10, wt = avg_log2FC)
+  
+  # Store results for the current cell type
+  subcluster_results[[cell_type]] <- list(
+   subset = cell_type_subset,
+   umap_plot = umap_plot,
+   top_markers = top_markers
+  )
+  
+  # Display the UMAP plot
+  #print(umap_plot)
+  
+  # Create a heatmap of the top markers for subclusters
+  heatmap_plot <- DoHeatmap(cell_type_subset, features = top_markers$gene) +
+                 ggtitle(paste("Heatmap of Top Markers in", cell_type, "Subclusters")) +
+                 scale_fill_viridis_c()
+  # Save the heatmap to a file
+  ggsave(filename = paste0(cell_type, "_heterogeneity_heatmap.png"), plot = heatmap_plot, width = 10, height = 8)
+  ggsave(filename = paste0(cell_type, "_heterogeneity_umap.png"), plot = umap_plot, width = 10, height = 8)
+  # Display the heatmap
+}
+```
+
+
+
+-------------------------------------------------------------------------------------
+#This is for the cell chat. but actually, we find that there is no data in recptor/ligand/signal pathway, thus fail to calculate the probability
+```{r}
+devtools::install_github("jinworks/CellChat")
+```
+
+
+```{r}
+library(CellChat)
+library(patchwork)
+options(stringsAsFactors = FALSE)
+```
+
+#from the tutorial of github
+```{r}
+# Extract the normalized data matrix
+if (packageVersion("Seurat") >= "5.0.0") {
+    data.input <- pbmc_combo[["RNA"]]$data  # For Seurat >= 5.0.0
+} else {
+    data.input <- pbmc_combo[["RNA"]]@data   # For Seurat < 5.0.0
+}
+
+# Get the cell identities (cluster labels)
+labels <- Idents(pbmc_combo)
+
+# Create a data frame of the cell labels
+meta <- data.frame(labels = labels, row.names = names(labels))
+
+# Check the first few rows of the extracted data and metadata
+head(data.input)
+head(meta)
+```
+
+#from the tutorial of github
+```{r}
+cellChat <- createCellChat(object = pbmc_combo, group.by = "ident", assay = "RNA")
+
+```
+
+
+#check and find no infor for analysis
+```{r}
+str(cellChat)
+dim(cellChat@data)  # Check the dimensions of the data matrix
+head(cellChat@meta)  # Inspect the first few rows of the metadata
+table(cellChat@idents)  # Check the distribution of cell types
+str(cellChat@data.signaling)
+
+```
+
+#from the tutorial of github
+```{r}
+#whole
+ptm = Sys.time()
+groupSize <- as.numeric(table(cellchat@idents))
+par(mfrow = c(1,2), xpd=TRUE)
+netVisual_circle(cellchat@net$count, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Number of interactions")
+netVisual_circle(cellchat@net$weight, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Interaction weights/strength")
+```
+
+#from the tutorial of github
+```{r}
+#each
+mat <- cellchat@net$weight
+par(mfrow = c(3,4), xpd=TRUE)
+for (i in 1:nrow(mat)) {
+  mat2 <- matrix(0, nrow = nrow(mat), ncol = ncol(mat), dimnames = dimnames(mat))
+  mat2[i, ] <- mat[i, ]
+  netVisual_circle(mat2, vertex.weight = groupSize, weight.scale = T, edge.weight.max = max(mat), title.name = rownames(mat)[i])
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+Optional: delete `pbmcsca` to free up RAM.
+```{r}
+rm(pbmcsca); gc()
+```
+You are encouraged to run the analysis of `pbmc` on Spartan (you can use Open Ondemand to have an interactive R session). However, if you find `pbmc` too large to handle, you can subsample it further to reduce sample size.
+
+Now try to do visualisation, annotation and batch correction of `pbmc`. There are various ways for doing those. For example, we split a multi-batch dataset into individual batches. You don't have to do the same. We used PCA for diemsnion reduction, but Seurat also provided other more sophisticated methods. What are those and how were they compared to PCA? 
+
+Another question we did not explore was how should be annotate a multi-batch dataset using Azimuth reference. There are potentially three ways
+
+- Annotate batches one by one (by splitting into individual batches)(Loss of Biological Cohesion)
+
+- Annotate them together, without batch correction ?
+
+- Annotate them together, after batch correction
+
+Will these three approaches lead to very different results?
+
+A:
+1. UMAP-- keep relative location for visualizing clusters
+
+2. This time I select 'Annotate them together, after batch correction' and using IntergrateLayer to correct this effect
+Enhanced Detection of Rare Cell Types
+More Accurate and Consistent Annotations
+Improved Clustering
+
+
+
+
+
+
+# 10x Visium mouse brain data
+
+
+In practical we looked at one mouse brain section labelled 'anterior1'. Now we look at another section.
+
+```{r}
+library(Seurat)
+library(SeuratData)
+library(ggplot2)
+InstallData("stxBrain")
+brain <- LoadData("stxBrain", type = "anterior2")
+```
+
+Do some visualisation to explore the dataset first.
+
+We used a subset of `allen_cortex` scRNA-seq data as reference to deconvolute Visium spots. You can still use that but you're encouraged to use the original dataset from [here](https://www.dropbox.com/s/cuowvm4vrf65pvq/allen_cortex.rds?dl=1).
+
+There are three R based cell type deconvolution tools you could try: Seurat V3 and PhiSpace were covered by practical. RCTD works well but might be slow to compute.
+
+Install [PhiSpace](https://github.com/jiadongm/PhiSpace):
+```{r}
+if(!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+BiocManager::install(c("SingleCellExperiment", "scran", "scuttle", "ComplexHeatmap"))
+if(!requireNamespace("devtools", quietly = TRUE)) {
+  install.packages("devtools")
+}
+devtools::install_github('jiadongm/PhiSpace/pkg')
+```
+
+Install [RCTD](https://github.com/dmcable/spacexr)
+```{r}
+devtools::install_github("dmcable/spacexr", build_vignettes = FALSE)
+```
+This [vignette](https://satijalab.org/seurat/articles/spatial_vignette) can help you implement RCTD.
+
+```{r}
+library(Seurat)
+options(Seurat.object.assay.version = "v5")
+library(SeuratData)
+library(ggplot2)
+```
+
+
+```{r}
+InstallData("stxBrain")
+brain <- LoadData("stxBrain", type = "anterior2")
+```
+
+#codes are copied from the practical
+```{r}
+brain <- NormalizeData(brain, assay = "Spatial")
+brain <- SCTransform(brain, assay = "Spatial")
+cMat <- brain[["Spatial"]]$counts
+cMat <- log1p(cMat)
+brain[["log1p"]] <- CreateAssayObject(
+  data = cMat
+)
+```
+
+
+```{r}
+brain@active.assay <- "Spatial"
+brain <- FindVariableFeatures(brain)
+brain <- ScaleData(brain)
+brain <- RunPCA(brain)
+brain <- FindNeighbors(brain, reduction = "pca", dims = 1:30)
+brain <- FindClusters(brain, resolution = 0.5)
+brain <- RunUMAP(brain, reduction = "pca", dims = 1:30)
+```
+
+
+```{r}
+DimPlot(brain, reduction = "umap", label = TRUE)
+SpatialDimPlot(brain, label = TRUE, label.size = 3, image.alpha = 0, pt.size.factor = 2)
+```
+
+
+```{r}
+library(PhiSpace)
+library(SingleCellExperiment)
+library(scran)
+```
+
+
+```{r}
+reference <- readRDS("D:\\bioinforcase\\allen_cortex.rds")
+```
+
+```{r}
+brain_seurat <- NormalizeData(brain)
+reference_seurat <- NormalizeData(reference)
+
+```
+
+
+```{r}
+brain_seurat <- FindVariableFeatures(brain_seurat)
+reference_seurat <- FindVariableFeatures(reference_seurat)
+
+```
+```{r}
+brain_seurat_small <- subset(brain_seurat, cells = sample(colnames(brain_seurat), size = 1000))
+reference_seurat_small <- subset(reference_seurat, cells = sample(colnames(reference_seurat), size = 1000))
+anchors <- FindIntegrationAnchors(object.list = list(brain_seurat_small, reference_seurat_small))
+combined <- IntegrateData(anchorset = anchors)
+
+```
+
+```{r}
+anchors <- FindIntegrationAnchors(object.list = list(brain_seurat, reference_seurat))
+combined <- IntegrateData(anchorset = anchors)
+
+```
+
+
+```{r}
+combined <- ScaleData(combined)
+combined <- RunPCA(combined)
+```
+
+```{r}
+combined <- FindNeighbors(combined)
+combined <- FindClusters(combined)
+combined <- RunUMAP(combined, dims = 1:20)  # Adjust the number of dimensions as needed
+
+DimPlot(combined, reduction = "umap")
+
+```
+
+```{r}
+# Add a new metadata column for cell types (if not already done)
+combined$cell_type <- Idents(combined)
+```
+
+
+```{r}
+# Check available assays
+names(combined@assays)
+
+```
+```{r}
+# Check spatial coordinates and data
+spatial_data <- combined[["Spatial"]]
+print(spatial_data)
+
+```
+```{r}
+#SpatialPlot(combined, features = c("GeneA", "GeneB"), slot = "data", image.alpha = 1)
+
+```
+
+```{r}
+# View the first few rows of the metadata
+head(combined@meta.data)
+
+```
+```{r}
+# Check unique values in the seurat_clusters column
+unique(combined@meta.data$seurat_clusters)
+
+```
+
+
+```{r}
+SpatialPlot(combined, features = "nCount_Spatial", slot = "counts", image.alpha = 1)
+
+
+```
+```{r}
+# Specify the cluster of interest
+cluster_of_interest <- 0
+
+# Create a new metadata column to indicate if the cell belongs to the cluster of interest
+combined@meta.data$ClusterInterest <- ifelse(combined@meta.data$seurat_clusters == cluster_of_interest, 
+                                              "Cluster 0", "Other")
+
+# Ensure that ClusterInterest is a factor
+combined@meta.data$ClusterInterest <- factor(combined@meta.data$ClusterInterest)
+
+# Plot the spatial distribution of Cluster 0
+SpatialPlot(combined, features = "ClusterInterest", image.alpha = 1) +
+  scale_color_manual(values = c("Cluster 0" = "blue", "Other" = "gray")) +  # Define colors for clusters
+  ggtitle("Spatial Distribution of Cluster 0") +
+  theme(legend.position = "bottom")  # Optional: adjust legend position
+
+
+```
+
+
+```{r}
+brain_sce <- as.SingleCellExperiment(brain)  # Convert the Seurat object to SingleCellExperiment
+reference_sce <- as.SingleCellExperiment(reference)  # Do the same for the reference
+```
+
+
+```{r}
+brain <- RunPCA(brain, features = VariableFeatures(object = brain))
+brain <- RunUMAP(brain, dims = 1:30)
+# Plot UMAP
+DimPlot(brain, reduction = "umap", group.by = "seurat_clusters")
+```
+
+
+```{r}
+# Check the structure of brain_sce
+str(brain_sce)
+
+# Check the structure of reference_sce
+str(reference_sce)
+
+```
+
+
+
+```{r}
+# Dimensions of brain_sce
+dim(brain_sce)
+
+# Dimensions of reference_sce
+dim(reference_sce)
+```
+
+
+```{r}
+# Subset brain_sce to only common features
+brain_sce_filtered <- brain_sce[common_features, ]
+
+# Subset reference_sce to only common features
+reference_sce_filtered <- reference_sce[common_features, ]
+
+```
+
+```{r}
+# Check dimensions after filtering
+dim(brain_sce_filtered)       # Should show (features, samples)
+dim(reference_sce_filtered)    # Should show (features, samples)
+```
+
+
+
+```{r}
+# Define phenotypes from reference_sce_filtered
+phenotypes <- colData(reference_sce_filtered)$class  # or 'subclass'
+
+# Define response from brain_sce_filtered
+response <- colData(brain_sce_filtered)$nCount_Spatial  # Use 'nCount_Spatial'
+
+# Verify lengths
+print(length(phenotypes))  # Should match the number of columns in reference_sce_filtered
+print(length(response))     # Should match the number of columns in brain_sce_filtered
+
+```
+```{r}
+# Sample IDs for brain_sce_filtered and reference_sce_filtered
+brain_sample_ids <- colnames(brain_sce_filtered)
+reference_sample_ids <- colnames(reference_sce_filtered)
+
+# Get indices of reference samples that match brain samples
+matching_indices <- which(reference_sample_ids %in% brain_sample_ids)
+
+# Subset phenotypes using matching indices
+aligned_phenotypes <- phenotypes[matching_indices]
+
+# Verify the length of aligned_phenotypes
+print(length(aligned_phenotypes))  # Should match the length of response (2825)
+
+```
+
+
+
+```{r}
+deconvolution_result <- PhiSpace(
+    query = brain_sce,           # brain dataset
+    reference = reference_sce,   # reference dataset
+    phenotypes = phenotypes,     # Phenotypes from brain_sce
+    response = response,         # Response data from brain_sce
+    #assay2rank = "counts",       # Use the "counts" assay for reference_sce
+    #assay2predict = "logcounts"     # Use the "counts" assay for brain_sce
+)
+
+# Check the result
+deconvolution_result
+
+```
+
+```{r}
+plot(deconvolution_result)
+```
+
+
+```{r}
+# Create UMAP Plot
+umap_data <- as.data.frame(reducedDims(brain_sce)$UMAP)
+umap_data$cell_type <- deconvolution_result$predicted_cell_types
+
+ggplot(umap_data, aes(x = UMAP1, y = UMAP2, color = cell_type)) +
+  geom_point(alpha = 0.7) +
+  theme_minimal() +
+  labs(title = "UMAP of Predicted Cell Types", color = "Cell Type")
+
+# Create Spatial Map
+spatial_coords <- as.data.frame(colData(brain_sce)[, c("X", "Y")])
+spatial_coords$cell_type <- deconvolution_result$predicted_cell_types
+
+ggplot(spatial_coords, aes(x = X, y = Y, color = cell_type)) +
+  geom_point(size = 2) +
+  theme_void() +
+  labs(title = "Spatial Map of Predicted Cell Types", color = "Cell Type") +
+  scale_color_manual(values = c("red", "blue", "green", "yellow"))  # Adjust colors as needed
+```
+
