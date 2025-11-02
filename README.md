@@ -13,7 +13,7 @@ My recent research focuses on understanding **ERK1/2-mediated transcriptional co
 
 ## 🔍 Projects
 
-## 📊 [1️⃣ PBMC Single-Cell RNA-seq Analysis](https://github.com/revone1013/bio-data-portfolio/blob/main/pbmc-scRNA/pbmc_analysis.html)
+## 📊 [1️⃣ PBMC Single-Cell RNA-seq Analysis](https://github.com/revone1013/bio-data-portfolio/blob/main/pbmc-scRNA/AlternativeDatasets_scRNA-seq_final.nb.html)
 
 Analysis of peripheral blood mononuclear cells using **Seurat** and **SingleR** to identify immune cell subtypes.
 
