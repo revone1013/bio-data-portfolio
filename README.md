@@ -13,7 +13,7 @@ My recent research focuses on understanding **ERK1/2-mediated transcriptional co
 
 ## 🔍 Projects
 
-## 📊 [1️⃣ PBMC Single-Cell RNA-seq Analysis](https://revone1013.github.io/bio-data-portfolio/pbmc-scRNA/pbmc_analysis.html)
+## 📊 [1️⃣ PBMC Single-Cell RNA-seq Analysis](https://github.com/revone1013/bio-data-portfolio/blob/main/pbmc-scRNA/pbmc_analysis.html)
 
 Analysis of peripheral blood mononuclear cells using **Seurat** and **SingleR** to identify immune cell subtypes.
 
@@ -26,42 +26,13 @@ Analysis of peripheral blood mononuclear cells using **Seurat** and **SingleR** 
 
 ---
 
-## 🧠 [2️⃣ ERK1/2 Motif Discovery and TF Prediction](https://revone1013.github.io/bio-data-portfolio/erk-mapk1-3/erk_analysis_report.html)
+## 🧠 [2️⃣ ERK1/2 Motif Discovery and TF Prediction](https://github.com/revone1013/bio-data-portfolio/blob/main/erk-mapk1-3/erk_analysis_report.html)
 
 Investigation of **ERK1/2 signaling** and potential downstream **transcription factors** involved in myelination processes.
 
 **Highlights:**
 - Motif discovery using **MEME Suite**  
-- TF prediction using **TOMTOM** and **JASPAR**  and **(i)GPS** 
+- TF prediction using **TOMTOM**, **JASPAR**, and **iGPS**  
 - Integration of cross-species promoter data (mouse and zebrafish)  
 
-**Tech:** MEME Suite, pyjaspar, Biopython, R  
-
----
-
-## 🧰 Skills & Tools
-
-| Category | Tools / Languages |
-|-----------|------------------|
-| **Programming** | Python, R, Bash |
-| **Bioinformatics** | MEME Suite, Biopython, pyjaspar, Seurat, SingleR |
-| **Data Science** | Pandas, NumPy, ggplot2, Matplotlib |
-| **Version Control** | Git, GitHub |
-| **Visualization** | R Markdown, HTML reports, ggplot2 |
-
----
-
-## 🎯 Research Interests
-
-- Transcriptional regulation and signaling pathways  
-- Neural development and oligodendrocyte biology  
-- Single-cell and motif-based computational analysis  
-- Integration of omics data for biological discovery  
-
----
-
-📫 **Contact:**  
-If you'd like to collaborate or learn more, feel free to reach out via GitHub or email.
-
-📅 **Last updated:** November 2025  
-
+**Te**
