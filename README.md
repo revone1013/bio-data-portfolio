@@ -15,6 +15,7 @@ My recent research focuses on understanding **ERK1/2-mediated transcriptional co
 
 ## 📊 [1️⃣ PBMC Single-Cell RNA-seq Analysis](https://revone1013.github.io/bio-data-portfolio/pbmc-scRNA/pbmc_analysis.html)
 🧬 [View code on GitHub](https://github.com/revone1013/bio-data-portfolio/tree/main/pbmc-scRNA)
+
 Analysis of peripheral blood mononuclear cells using **Seurat** and **SingleR** to identify immune cell subtypes.
 
 **Highlights:**
@@ -28,6 +29,7 @@ Analysis of peripheral blood mononuclear cells using **Seurat** and **SingleR** 
 
 ## 🧠 [2️⃣ ERK1/2 Motif Discovery and TF Prediction](https://revone1013.github.io/bio-data-portfolio/erk-mapk1-3/erk_analysis_report.html)
 📂 [View code on GitHub](https://github.com/revone1013/bio-data-portfolio/tree/main/erk-mapk1-3)
+
 Investigation of **ERK1/2 signaling** and potential downstream **transcription factors** involved in myelination processes.
 
 **Highlights:**
